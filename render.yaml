@@ -20,9 +20,9 @@ services:
       - key: WEBHOOK_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: http://localhost:5173
+        value: https://antigravity-agency-platform-1.onrender.com
       - key: CORS_ORIGIN
-        value: http://localhost:5173
+        value: https://antigravity-agency-platform-1.onrender.com
 
 databases:
   - name: antigravity-postgres

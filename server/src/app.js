@@ -21,27 +21,35 @@ export function createApp() {
   app.use(securityHeadersMiddleware);
 
   // 2. Production-Safe CORS Configuration
-  const allowedOrigins = [
+  const explicitAllowedOrigins = [
     env.FRONTEND_URL,
     env.CORS_ORIGIN,
+    'https://antigravity-agency-platform-1.onrender.com',
+    'https://antigravity-agency-platform.onrender.com',
     'http://localhost:5173',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
   ].filter(Boolean);
 
+  const isAllowedOrigin = (origin) => {
+    // Allow requests with no origin (mobile apps, server-side tests, curl)
+    if (!origin) return true;
+    if (!env.isProduction) return true;
+    if (explicitAllowedOrigins.includes(origin)) return true;
+    // Allow verified onrender.com subdomains safely
+    if (/^https:\/\/[a-zA-Z0-9\-_.]+\.onrender\.com$/.test(origin)) return true;
+    return false;
+  };
+
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, server-side tests, curl)
-        if (!origin) {
+        if (isAllowedOrigin(origin)) {
           return callback(null, true);
         }
 
-        if (!env.isProduction || allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-
-        return callback(new Error(`CORS policy violation: Origin "${origin}" is not allowed.`));
+        // Clean CORS rejection without throwing uncaught 500 internal error
+        return callback(null, false);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

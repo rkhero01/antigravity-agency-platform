@@ -84,6 +84,44 @@ async function runAuthProfileMenuTests() {
   assert('New token is stored', Boolean(apiClient.getAuthToken()));
   assert('User is authenticated again', authSessionService.isAuthenticated());
 
+  // Test 8: Local Express CORS validation
+  console.log('\n[SECTION 8] CORS Origin Validation');
+  const { app } = await import('../../server/src/app.js');
+  const http = await import('http');
+  const localPort = 4995;
+  const localServer = app.listen(localPort);
+
+  try {
+    const testCors = (origin) => {
+      return new Promise((resolve) => {
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port: localPort,
+          path: '/api/v1/health/live',
+          method: 'GET',
+          headers: origin ? { Origin: origin } : {},
+        }, (res) => {
+          resolve({
+            status: res.statusCode,
+            corsHeader: res.headers['access-control-allow-origin'],
+          });
+        });
+        req.end();
+      });
+    };
+
+    const resRenderFrontend = await testCors('https://antigravity-agency-platform-1.onrender.com');
+    assert('Render frontend origin receives allowed CORS header', resRenderFrontend.corsHeader === 'https://antigravity-agency-platform-1.onrender.com');
+
+    const resLocalhost = await testCors('http://localhost:5173');
+    assert('Localhost development origin receives allowed CORS header', resLocalhost.corsHeader === 'http://localhost:5173');
+
+    const resDisallowed = await testCors('https://malicious-external-site.com');
+    assert('Disallowed origin cleanly rejected (no CORS header, no 500 error)', !resDisallowed.corsHeader && resDisallowed.status === 200);
+  } finally {
+    localServer.close();
+  }
+
   // Clean up
   await authSessionService.logout();
 
