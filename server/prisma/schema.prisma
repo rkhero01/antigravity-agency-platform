@@ -51,6 +51,7 @@ model Agency {
   contracts            Contract[]
   invoices             Invoice[]
   auditLogs            AuditLog[]
+  socialAccounts       SocialAccount[]
 
   @@index([status])
   @@index([createdAt])
@@ -134,6 +135,7 @@ model Client {
   aiAnomalies         AIAnomaly[]
   aiActions           AIAction[]
   auditLogs           AuditLog[]
+  socialAccounts      SocialAccount[]
 
   @@index([agencyId])
   @@index([status])
@@ -238,6 +240,35 @@ model CampaignMetric {
 
   @@index([campaignId])
   @@index([recordedDate])
+}
+
+// ------------------------------------------------------------------------------
+// 4.5 SOCIAL ACCOUNTS & PLATFORMS
+// ------------------------------------------------------------------------------
+
+model SocialAccount {
+  id                String    @id @default(uuid())
+  agencyId          String
+  clientId          String?
+  platform          String    // META, FACEBOOK, INSTAGRAM, GOOGLE_BUSINESS, YOUTUBE, LINKEDIN
+  accountName       String
+  handle            String?
+  platformAccountId String?
+  status            String    @default("ACTIVE") // ACTIVE, NEEDS_REAUTH, DISCONNECTED, ERROR
+  tokenExpiresAt    DateTime?
+  scopes            String?
+  metadataJson      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  agency            Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client            Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([platform])
+  @@index([status])
 }
 
 // ------------------------------------------------------------------------------

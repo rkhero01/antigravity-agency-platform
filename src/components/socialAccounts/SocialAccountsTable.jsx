@@ -6,6 +6,7 @@ import {
   Clock,
   Shield,
   Trash2,
+  Building,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 
@@ -24,26 +25,23 @@ export function SocialAccountsTable({
             <tr>
               <th>Platform & Handle</th>
               <th>Client Workspace</th>
-              <th>Audience Followers</th>
-              <th>Connection Health</th>
-              <th>Publishing State</th>
-              <th>OAuth Expiry</th>
-              <th>Last Synced</th>
+              <th>Connection Status</th>
+              <th>Token Health</th>
+              <th>Granted Capabilities</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {accounts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-muted">
+                <td colSpan={6} className="text-center py-8 text-muted">
                   No social accounts match your filter criteria.
                 </td>
               </tr>
             ) : (
               accounts.map((account) => {
                 const isExpired = account.status === 'Needs Re-auth';
-                const isExpiringSoon =
-                  account.tokenDaysRemaining <= 14 && account.tokenDaysRemaining > 0;
+                const isExpiringSoon = account.status === 'Expiring Soon';
 
                 return (
                   <tr key={account.id} className="social-row-item">
@@ -58,7 +56,7 @@ export function SocialAccountsTable({
                             className="table-handle-link clickable"
                             onClick={() => onInspectAccount(account)}
                           >
-                            {account.handle}
+                            {account.handle || account.accountName}
                           </strong>
                           <span className="table-account-name">{account.accountName}</span>
                         </div>
@@ -67,15 +65,9 @@ export function SocialAccountsTable({
 
                     {/* Client */}
                     <td>
-                      <span className="table-client-name">🏢 {account.clientName}</span>
-                    </td>
-
-                    {/* Followers */}
-                    <td>
-                      <div className="table-followers-cell">
-                        <strong>{account.followers}</strong>
-                        <span className="table-delta-tag positive">{account.followersDelta || '+12%'}</span>
-                      </div>
+                      <span className="table-client-name">
+                        <Building size={12} className="inline-icon" /> {account.clientName || 'Agency Workspace'}
+                      </span>
                     </td>
 
                     {/* Connection Health */}
@@ -95,56 +87,37 @@ export function SocialAccountsTable({
                       )}
                     </td>
 
-                    {/* Publishing Pipeline */}
+                    {/* Token Health */}
                     <td>
-                      <Badge
-                        variant={account.publishingStatus === 'Active' ? 'success' : 'warning'}
-                        size="sm"
-                      >
-                        {account.publishingStatus}
-                      </Badge>
-                    </td>
-
-                    {/* OAuth Expiry */}
-                    <td>
-                      <span className={`table-expiry-date ${isExpired ? 'expired' : isExpiringSoon ? 'expiring' : ''}`}>
-                        {account.tokenExpires}
+                      <span className={`table-expiry-date ${isExpired ? 'expired' : isExpiringSoon ? 'expiring' : 'text-emerald'}`}>
+                        {isExpired ? 'Expired' : `${account.tokenDaysRemaining} Days Active`}
                       </span>
                     </td>
 
-                    {/* Last Synced */}
+                    {/* Scopes */}
                     <td>
-                      <span className="table-sync-time">{account.lastSync}</span>
+                      <span className="text-muted text-xs">
+                        {account.scopes?.length || 2} Scopes Authorized
+                      </span>
                     </td>
 
                     {/* Actions */}
                     <td>
                       <div className="table-actions-cell">
-                        {isExpired ? (
-                          <button
-                            type="button"
-                            className="btn-table-action reconnect"
-                            onClick={() => onReconnectAccount(account.id)}
-                            title="Reconnect OAuth Token"
-                          >
-                            <RefreshCw size={13} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn-table-action"
-                            onClick={() => onSyncAccount(account.id)}
-                            title="Sync Now"
-                          >
-                            <RefreshCw size={13} />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="btn-table-action"
+                          onClick={() => onReconnectAccount ? onReconnectAccount(account.id) : onSyncAccount(account.id)}
+                          title="Refresh Connection State"
+                        >
+                          <RefreshCw size={13} />
+                        </button>
 
                         <button
                           type="button"
                           className="btn-table-action"
                           onClick={() => onInspectAccount(account)}
-                          title="Inspect Scopes"
+                          title="Inspect Scopes & Details"
                         >
                           <Shield size={13} />
                         </button>

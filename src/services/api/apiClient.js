@@ -398,6 +398,19 @@ class ApiClient {
       providers: () => this.get('/api/v1/health/providers'),
     };
   }
+
+  // 14. Social Accounts & Platform Management
+  get socialAccounts() {
+    return {
+      list: (params) => this.get('/api/v1/social-accounts', { params }),
+      getOAuthStatus: () => this.get('/api/v1/social-accounts/oauth-status'),
+      getById: (id) => this.get(`/api/v1/social-accounts/${id}`),
+      connect: (data) => this.post('/api/v1/social-accounts/connect', data),
+      update: (id, data) => this.patch(`/api/v1/social-accounts/${id}`, data),
+      reconnect: (id, data = {}) => this.post(`/api/v1/social-accounts/${id}/reconnect`, data),
+      disconnect: (id) => this.delete(`/api/v1/social-accounts/${id}`),
+    };
+  }
 }
 
 export const apiClient = new ApiClient();

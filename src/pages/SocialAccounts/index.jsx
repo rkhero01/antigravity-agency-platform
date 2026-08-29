@@ -8,15 +8,17 @@ import {
   AccountDetailModal,
 } from '../../components/socialAccounts/index.js';
 import { socialAccountsService } from '../../services/socialAccountsService.js';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export function SocialAccountsPage({
   activeClient = 'all',
   onNavigate,
 }) {
   const [accounts, setAccounts] = useState([]);
+  const [oauthStatus, setOauthStatus] = useState({});
   const [loading, setLoading] = useState(true);
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   // View Mode & Filters
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
@@ -47,11 +49,28 @@ export function SocialAccountsPage({
     }, 3500);
   };
 
-  const loadAccounts = async () => {
-    setLoading(true);
-    const data = await socialAccountsService.getAccounts();
-    setAccounts(data);
-    setLoading(false);
+  const loadAccounts = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setIsRefreshing(true);
+    setError(null);
+
+    try {
+      const [data, oauth] = await Promise.all([
+        socialAccountsService.getAccounts(),
+        socialAccountsService.getOAuthStatus(),
+      ]);
+      setAccounts(data);
+      setOauthStatus(oauth);
+    } catch (err) {
+      console.error('Failed to load social accounts from database:', err);
+      setError(
+        err.message ||
+          'Unable to connect to database or retrieve social accounts. Please check connection and retry.'
+      );
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
   // Filtered Accounts
@@ -62,21 +81,20 @@ export function SocialAccountsPage({
       const matchesPlatform =
         selectedPlatform === 'all'
           ? true
+          : selectedPlatform === 'META'
+          ? a.platform === 'META' || a.platform === 'FACEBOOK' || a.platform === 'INSTAGRAM'
           : a.platform.toLowerCase() === selectedPlatform.toLowerCase();
       const matchesStatus =
         selectedStatus === 'all'
           ? true
-          : selectedStatus === 'Needs Re-auth'
-          ? a.status === 'Needs Re-auth'
-          : selectedStatus === 'Expiring Soon'
-          ? a.tokenDaysRemaining <= 14 && a.tokenDaysRemaining > 0
           : a.status.toLowerCase() === selectedStatus.toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        !searchQuery.trim() ||
-        a.handle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.platform.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        (a.handle || '').toLowerCase().includes(q) ||
+        (a.accountName || '').toLowerCase().includes(q) ||
+        (a.clientName || '').toLowerCase().includes(q) ||
+        (a.platform || '').toLowerCase().includes(q);
 
       return matchesClient && matchesPlatform && matchesStatus && matchesSearch;
     });
@@ -84,55 +102,48 @@ export function SocialAccountsPage({
 
   // Health Summary Metrics
   const healthMetrics = useMemo(() => {
-    return socialAccountsService.calculateHealthMetrics(filteredAccounts);
-  }, [filteredAccounts]);
+    return socialAccountsService.calculateHealthMetrics(accounts);
+  }, [accounts]);
 
   // Handlers
-  const handleSyncAccount = async (id) => {
-    const updated = await socialAccountsService.syncAccount(id);
-    setAccounts((prev) => prev.map((a) => (a.id === id ? updated : a)));
-    if (inspectedAccount && inspectedAccount.id === id) {
-      setInspectedAccount(updated);
-    }
-    showToast(`🔄 Synced latest insights & token health for ${updated.handle}`);
-  };
-
-  const handleSyncAll = async () => {
-    setIsSyncingAll(true);
-    const refreshed = await socialAccountsService.syncAllAccounts();
-    setAccounts(refreshed);
-    setTimeout(() => {
-      setIsSyncingAll(false);
-      showToast('✨ All connected social channels synced successfully!');
-    }, 600);
+  const handleConnectAccount = async (accountData) => {
+    const created = await socialAccountsService.connectAccount(accountData);
+    await loadAccounts(true);
+    showToast(`🎉 Successfully connected ${created.accountName} (${created.platform})!`);
   };
 
   const handleReconnectAccount = async (id) => {
-    const reconnected = await socialAccountsService.reconnectAccount(id);
-    setAccounts((prev) => prev.map((a) => (a.id === id ? reconnected : a)));
+    const result = await socialAccountsService.reconnectAccount(id);
+    setAccounts((prev) => prev.map((a) => (a.id === id ? result.account : a)));
     if (inspectedAccount && inspectedAccount.id === id) {
-      setInspectedAccount(reconnected);
+      setInspectedAccount(result.account);
     }
-    showToast(`🎉 Successfully refreshed OAuth credentials for ${reconnected.handle}!`);
-  };
-
-  const handleConnectAccount = async (accountData) => {
-    const created = await socialAccountsService.connectAccount(accountData);
-    setAccounts((prev) => [created, ...prev]);
-    showToast(`🚀 Connected ${created.platform} account: ${created.handle}!`);
+    showToast(`🔄 ${result.message}`);
+    return result;
   };
 
   const handleDisconnectAccount = async (id) => {
-    await socialAccountsService.disconnectAccount(id);
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
-    showToast('Channel disconnected from agency workspace');
+    const target = accounts.find((a) => a.id === id);
+    const confirm = window.confirm(
+      `Are you sure you want to disconnect "${target?.accountName || 'this channel'}"? The record will be archived in PostgreSQL.`
+    );
+    if (!confirm) return;
+
+    try {
+      await socialAccountsService.disconnectAccount(id);
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      showToast('Social channel asset disconnected');
+    } catch (err) {
+      console.error('Failed to disconnect account:', err);
+      alert(err.message || 'Failed to disconnect account.');
+    }
   };
 
   return (
     <div className="social-accounts-page-container">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="ai-toast-notification">
+        <div className="ai-toast-notification" role="status">
           <CheckCircle2 size={16} className="text-success" />
           <span>{toastMessage}</span>
         </div>
@@ -150,19 +161,45 @@ export function SocialAccountsPage({
         onStatusChange={setSelectedStatus}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onSyncAll={handleSyncAll}
         onOpenConnectModal={() => setIsConnectModalOpen(true)}
-        isSyncingAll={isSyncingAll}
+        onRefresh={() => loadAccounts(true)}
+        isRefreshing={isRefreshing}
       />
 
-      {/* 5 Top Health KPI Stat Cards */}
+      {/* 5 Top KPI Health Metrics */}
       <SocialHealthKpiCards metrics={healthMetrics} />
 
-      {/* Main View Area: Grid Cards or Audit Table */}
-      {viewMode === 'grid' ? (
+      {/* Main Content Area: Loading, Error, or Grid/Table */}
+      {loading ? (
+        <div className="clients-state-box loading">
+          <div className="clients-loading-spinner" />
+          <p className="clients-state-title">
+            Loading social channel connections from PostgreSQL database...
+          </p>
+          <span className="clients-state-sub">
+            Verifying token scopes & client tenant binding
+          </span>
+        </div>
+      ) : error ? (
+        <div className="clients-state-box error" role="alert">
+          <div className="state-icon-badge error">
+            <AlertCircle size={28} />
+          </div>
+          <h3 className="clients-state-title">Database Connection Error</h3>
+          <p className="clients-state-desc">{error}</p>
+          <button
+            type="button"
+            className="btn-saas-primary"
+            onClick={() => loadAccounts(false)}
+          >
+            <RefreshCw size={14} />
+            <span>Retry Connection</span>
+          </button>
+        </div>
+      ) : viewMode === 'grid' ? (
         <SocialAccountsGrid
           accounts={filteredAccounts}
-          onSyncAccount={handleSyncAccount}
+          onSyncAccount={handleReconnectAccount}
           onReconnectAccount={handleReconnectAccount}
           onInspectAccount={(acc) => setInspectedAccount(acc)}
           onDisconnectAccount={handleDisconnectAccount}
@@ -171,7 +208,7 @@ export function SocialAccountsPage({
       ) : (
         <SocialAccountsTable
           accounts={filteredAccounts}
-          onSyncAccount={handleSyncAccount}
+          onSyncAccount={handleReconnectAccount}
           onReconnectAccount={handleReconnectAccount}
           onInspectAccount={(acc) => setInspectedAccount(acc)}
           onDisconnectAccount={handleDisconnectAccount}
@@ -183,15 +220,16 @@ export function SocialAccountsPage({
         isOpen={isConnectModalOpen}
         onClose={() => setIsConnectModalOpen(false)}
         onConnectAccount={handleConnectAccount}
+        oauthStatus={oauthStatus}
       />
 
-      {/* Account Detail & Diagnostics Modal */}
+      {/* Account Detail & Scopes Inspection Modal */}
       <AccountDetailModal
         account={inspectedAccount}
         isOpen={Boolean(inspectedAccount)}
         onClose={() => setInspectedAccount(null)}
-        onSyncAccount={handleSyncAccount}
-        onReconnectAccount={handleReconnectAccount}
+        onReconnect={handleReconnectAccount}
+        onDisconnect={handleDisconnectAccount}
       />
     </div>
   );

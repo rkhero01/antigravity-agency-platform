@@ -1,172 +1,210 @@
-import { initialMockSocialAccounts } from '../data/mockSocialAccounts.js';
-import { mockClients } from '../data/mockClients.js';
+/**
+ * Production Social Accounts Service Layer
+ * Task 5: Database-Connected Multi-Tenant Social Platform Management
+ */
 
-let accountsState = [...initialMockSocialAccounts];
+import { apiClient } from './api/apiClient.js';
+
+export const PLATFORM_INFO = {
+  META: { name: 'Meta Business Suite', label: 'Meta (Facebook & Instagram)', color: '#1877f2', icon: 'meta' },
+  FACEBOOK: { name: 'Facebook Page', label: 'Facebook Page', color: '#1877f2', icon: 'facebook' },
+  INSTAGRAM: { name: 'Instagram Professional', label: 'Instagram Business', color: '#e1306c', icon: 'instagram' },
+  GOOGLE_BUSINESS: { name: 'Google Business Profile', label: 'Google Business Profile', color: '#4285f4', icon: 'google' },
+  YOUTUBE: { name: 'YouTube Channel', label: 'YouTube Channel', color: '#ff0000', icon: 'youtube' },
+  LINKEDIN: { name: 'LinkedIn Company Page', label: 'LinkedIn Company Page', color: '#0a66c2', icon: 'linkedin' },
+};
+
+/**
+ * Normalizes PostgreSQL social account record into rich UI model
+ */
+export function normalizeSocialAccount(dbRecord) {
+  if (!dbRecord) return null;
+
+  const platformKey = (dbRecord.platform || 'META').toUpperCase();
+  const info = PLATFORM_INFO[platformKey] || PLATFORM_INFO.META;
+
+  // Calculate actual token days remaining
+  let tokenDaysRemaining = 60;
+  if (dbRecord.tokenExpiresAt) {
+    const diffMs = new Date(dbRecord.tokenExpiresAt) - new Date();
+    tokenDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  // Derive human status
+  const rawStatus = (dbRecord.status || 'ACTIVE').toUpperCase();
+  let status = 'Active';
+  let statusVariant = 'success';
+
+  if (rawStatus === 'DISCONNECTED' || dbRecord.deletedAt) {
+    status = 'Disconnected';
+    statusVariant = 'danger';
+  } else if (rawStatus === 'NEEDS_REAUTH' || tokenDaysRemaining <= 0) {
+    status = 'Needs Re-auth';
+    statusVariant = 'danger';
+  } else if (tokenDaysRemaining <= 14) {
+    status = 'Expiring Soon';
+    statusVariant = 'warning';
+  } else if (rawStatus === 'ERROR') {
+    status = 'Error';
+    statusVariant = 'danger';
+  }
+
+  return {
+    id: dbRecord.id,
+    agencyId: dbRecord.agencyId,
+    clientId: dbRecord.clientId || null,
+    clientName: dbRecord.clientName || 'Agency Workspace',
+    platform: platformKey,
+    platformLabel: info.label,
+    accountName: dbRecord.accountName || 'Unnamed Asset',
+    handle: dbRecord.handle || `@${dbRecord.platformAccountId || 'account'}`,
+    platformAccountId: dbRecord.platformAccountId || 'ext-unknown',
+    status,
+    statusRaw: rawStatus,
+    statusVariant,
+    tokenExpiresAt: dbRecord.tokenExpiresAt,
+    tokenDaysRemaining,
+    scopes: dbRecord.scopes ? dbRecord.scopes.split(',') : ['read_insights', 'manage_pages'],
+    createdAt: dbRecord.createdAt,
+    updatedAt: dbRecord.updatedAt,
+  };
+}
+
+/**
+ * Maps form input to backend payload
+ */
+export function toDbPayload(formData = {}) {
+  return {
+    clientId: formData.clientId && formData.clientId !== 'all' ? formData.clientId : null,
+    platform: (formData.platform || 'META').toUpperCase(),
+    accountName: String(formData.accountName || '').trim(),
+    handle: formData.handle ? String(formData.handle).trim() : null,
+    platformAccountId: formData.platformAccountId ? String(formData.platformAccountId).trim() : null,
+    status: formData.status ? String(formData.status).toUpperCase() : 'ACTIVE',
+    scopes: Array.isArray(formData.scopes) ? formData.scopes.join(',') : formData.scopes,
+  };
+}
 
 export const socialAccountsService = {
   /**
-   * Fetch all social accounts with optional filters
+   * Fetch all social accounts from live API
    */
   async getAccounts(filters = {}) {
-    const { clientId, platform, status, search } = filters;
+    const params = {};
+    if (filters.clientId && filters.clientId !== 'all') params.clientId = filters.clientId;
+    if (filters.platform && filters.platform !== 'all') params.platform = filters.platform;
+    if (filters.status && filters.status !== 'all') params.status = filters.status;
+    if (filters.search && filters.search.trim()) params.search = filters.search.trim();
 
-    let filtered = [...accountsState];
+    const response = await apiClient.socialAccounts.list(params);
+    const rawList = Array.isArray(response.data?.accounts)
+      ? response.data.accounts
+      : Array.isArray(response.data)
+      ? response.data
+      : [];
 
-    if (clientId && clientId !== 'all') {
-      filtered = filtered.filter((a) => a.clientId === clientId);
-    }
-
-    if (platform && platform !== 'all') {
-      filtered = filtered.filter(
-        (a) => a.platform.toLowerCase() === platform.toLowerCase()
-      );
-    }
-
-    if (status && status !== 'all') {
-      if (status === 'Needs Re-auth') {
-        filtered = filtered.filter((a) => a.status === 'Needs Re-auth');
-      } else if (status === 'Expiring Soon') {
-        filtered = filtered.filter((a) => a.tokenDaysRemaining <= 14 && a.tokenDaysRemaining > 0);
-      } else {
-        filtered = filtered.filter((a) => a.status.toLowerCase() === status.toLowerCase());
-      }
-    }
-
-    if (search && search.trim()) {
-      const q = search.toLowerCase().trim();
-      filtered = filtered.filter(
-        (a) =>
-          a.handle.toLowerCase().includes(q) ||
-          a.accountName.toLowerCase().includes(q) ||
-          a.clientName.toLowerCase().includes(q) ||
-          a.platform.toLowerCase().includes(q)
-      );
-    }
-
-    return Promise.resolve(filtered);
+    return rawList.map(normalizeSocialAccount);
   },
 
   /**
-   * Get account by ID
+   * Get single account by ID
    */
   async getAccountById(id) {
-    const account = accountsState.find((a) => a.id === id);
-    return Promise.resolve(account || null);
+    if (!id) return null;
+    const response = await apiClient.socialAccounts.getById(id);
+    const raw = response.data?.account || response.data;
+    return normalizeSocialAccount(raw);
   },
 
   /**
-   * Connect a new account
+   * Connect a new social account
    */
   async connectAccount(data) {
-    const client = mockClients.find((c) => c.id === data.clientId) || mockClients[0];
-    const newAccount = {
-      id: `sa-${Date.now()}`,
-      clientId: data.clientId,
-      clientName: client.name,
-      platform: data.platform || 'Instagram',
-      handle: data.handle.startsWith('@') ? data.handle : `@${data.handle}`,
-      accountName: data.accountName || `${client.name} ${data.platform}`,
-      followers: data.followers || '1.2K',
-      followersDelta: '+10.0%',
-      status: 'Connected',
-      health: 'Healthy',
-      publishingStatus: 'Active',
-      tokenExpires: '2026-11-30',
-      tokenDaysRemaining: 90,
-      lastSync: 'Just now (Synced)',
-      apiQuotaUsage: '8%',
-      scopes: [
-        `${data.platform.toLowerCase()}_basic`,
-        `${data.platform.toLowerCase()}_content_publish`,
-        'pages_read_engagement',
-      ],
-      icon: data.platform.toLowerCase().replace(/\s+/g, '-'),
-    };
-
-    accountsState = [newAccount, ...accountsState];
-    return Promise.resolve(newAccount);
+    const payload = toDbPayload(data);
+    const response = await apiClient.socialAccounts.connect(payload);
+    const raw = response.data?.account || response.data;
+    return normalizeSocialAccount(raw);
   },
 
   /**
-   * Reconnect / Refresh expired OAuth token
+   * Update existing social account
+   */
+  async updateAccount(id, updates) {
+    if (!id) throw new Error('Account ID is required');
+    const payload = toDbPayload(updates);
+    const response = await apiClient.socialAccounts.update(id, payload);
+    const raw = response.data?.account || response.data;
+    return normalizeSocialAccount(raw);
+  },
+
+  /**
+   * Reconnect / refresh social account credentials
    */
   async reconnectAccount(id) {
-    accountsState = accountsState.map((a) => {
-      if (a.id === id) {
-        return {
-          ...a,
-          status: 'Connected',
-          health: 'Healthy',
-          publishingStatus: 'Active',
-          tokenExpires: '2026-11-28',
-          tokenDaysRemaining: 90,
-          statusNote: undefined,
-          lastSync: 'Just now (Reconnected)',
-        };
-      }
-      return a;
-    });
-
-    const updated = accountsState.find((a) => a.id === id);
-    return Promise.resolve(updated);
+    if (!id) throw new Error('Account ID is required');
+    const response = await apiClient.socialAccounts.reconnect(id);
+    const raw = response.data?.account || response.data;
+    return {
+      account: normalizeSocialAccount(raw),
+      oauthConfigured: Boolean(response.data?.oauthConfigured),
+      message: response.data?.message || 'Connection refreshed in database.',
+    };
   },
 
   /**
-   * Sync single account
+   * Alias for reconnectAccount
    */
   async syncAccount(id) {
-    accountsState = accountsState.map((a) => {
-      if (a.id === id) {
-        return {
-          ...a,
-          lastSync: 'Just now (Synced)',
-        };
-      }
-      return a;
-    });
-    const updated = accountsState.find((a) => a.id === id);
-    return Promise.resolve(updated);
+    return (await this.reconnectAccount(id)).account;
   },
 
   /**
-   * Sync all accounts
-   */
-  async syncAllAccounts() {
-    accountsState = accountsState.map((a) => ({
-      ...a,
-      lastSync: 'Just now (All Synced)',
-    }));
-    return Promise.resolve([...accountsState]);
-  },
-
-  /**
-   * Disconnect account
+   * Disconnect social account
    */
   async disconnectAccount(id) {
-    accountsState = accountsState.filter((a) => a.id !== id);
-    return Promise.resolve(true);
+    if (!id) throw new Error('Account ID is required');
+    const response = await apiClient.socialAccounts.disconnect(id);
+    return response.data;
   },
 
   /**
-   * Compute summary health metrics
+   * Fetch OAuth configuration status
    */
-  calculateHealthMetrics(accountsList) {
+  async getOAuthStatus() {
+    try {
+      const response = await apiClient.socialAccounts.getOAuthStatus();
+      return response.data?.oauthStatus || {
+        META: false,
+        GOOGLE_BUSINESS: false,
+        YOUTUBE: false,
+        LINKEDIN: false,
+      };
+    } catch (e) {
+      return {
+        META: false,
+        GOOGLE_BUSINESS: false,
+        YOUTUBE: false,
+        LINKEDIN: false,
+      };
+    }
+  },
+
+  /**
+   * Calculate live KPI metrics from database records
+   */
+  calculateHealthMetrics(accountsList = []) {
     const total = accountsList.length;
-    const connectedCount = accountsList.filter((a) => a.status === 'Connected').length;
-    const reauthNeededCount = accountsList.filter((a) => a.status === 'Needs Re-auth').length;
-    const expiringSoonCount = accountsList.filter(
-      (a) => a.tokenDaysRemaining <= 14 && a.tokenDaysRemaining > 0
-    ).length;
-    const publishingActiveCount = accountsList.filter(
-      (a) => a.publishingStatus === 'Active'
-    ).length;
+    const active = accountsList.filter((a) => a.status === 'Active').length;
+    const needsReauth = accountsList.filter((a) => a.status === 'Needs Re-auth').length;
+    const expiringSoon = accountsList.filter((a) => a.status === 'Expiring Soon').length;
+    const clientIds = new Set(accountsList.map((a) => a.clientId).filter(Boolean));
 
     return {
       total,
-      connectedCount,
-      reauthNeededCount,
-      expiringSoonCount,
-      publishingActiveCount,
+      active,
+      needsReauth,
+      expiringSoon,
+      clientCount: clientIds.size,
     };
   },
 };

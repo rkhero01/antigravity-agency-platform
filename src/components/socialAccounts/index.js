@@ -1,7 +1,7 @@
-export * from './SocialHeader.jsx';
-export * from './SocialHealthKpiCards.jsx';
-export * from './SocialAccountCard.jsx';
-export * from './SocialAccountsGrid.jsx';
-export * from './SocialAccountsTable.jsx';
-export * from './ConnectAccountModal.jsx';
-export * from './AccountDetailModal.jsx';
+export { SocialHeader } from './SocialHeader.jsx';
+export { SocialHealthKpiCards } from './SocialHealthKpiCards.jsx';
+export { SocialAccountsGrid } from './SocialAccountsGrid.jsx';
+export { SocialAccountsTable } from './SocialAccountsTable.jsx';
+export { SocialAccountCard } from './SocialAccountCard.jsx';
+export { ConnectAccountModal } from './ConnectAccountModal.jsx';
+export { AccountDetailModal } from './AccountDetailModal.jsx';

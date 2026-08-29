@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Share2,
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
@@ -8,7 +7,7 @@ import {
   Key,
   Trash2,
   Shield,
-  Activity,
+  Building,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 
@@ -20,20 +19,20 @@ export function SocialAccountCard({
   onDisconnectAccount,
 }) {
   const isExpired = account.status === 'Needs Re-auth';
-  const isExpiringSoon = account.tokenDaysRemaining <= 14 && account.tokenDaysRemaining > 0;
+  const isExpiringSoon = account.status === 'Expiring Soon';
 
   const getPlatformHeaderColor = (platform) => {
-    switch (platform.toLowerCase()) {
+    switch ((platform || '').toLowerCase()) {
       case 'instagram':
         return 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)';
       case 'facebook':
         return 'linear-gradient(135deg, #1877f2, #0d65d9)';
+      case 'google_business':
+        return 'linear-gradient(135deg, #4285f4, #34a853)';
       case 'linkedin':
         return 'linear-gradient(135deg, #0a66c2, #004182)';
       case 'youtube':
         return 'linear-gradient(135deg, #ff0000, #cc0000)';
-      case 'tiktok':
-        return 'linear-gradient(135deg, #00f2fe, #4facfe)';
       default:
         return 'linear-gradient(135deg, #6366f1, #3b82f6)';
     }
@@ -51,9 +50,11 @@ export function SocialAccountCard({
         {/* Header with Handle and Client */}
         <div className="card-header-row">
           <div className="account-handle-block">
-            <span className="platform-tag-pill">{account.platform}</span>
-            <h4 className="account-handle-text">{account.handle}</h4>
-            <span className="account-client-tag">🏢 {account.clientName}</span>
+            <span className="platform-tag-pill">{account.platformLabel || account.platform}</span>
+            <h4 className="account-handle-text">{account.handle || account.accountName}</h4>
+            <span className="account-client-tag">
+              <Building size={12} className="inline-icon" /> {account.clientName || 'Agency Workspace'}
+            </span>
           </div>
 
           <div className="account-status-badge-box">
@@ -76,83 +77,52 @@ export function SocialAccountCard({
         {/* Display Name */}
         <span className="account-display-name">{account.accountName}</span>
 
-        {/* Followers & Growth Row */}
-        <div className="account-followers-box">
-          <div className="followers-left">
-            <span className="followers-label">Audience Size</span>
-            <strong className="followers-number">{account.followers}</strong>
-          </div>
-          <span className="followers-growth-tag positive">
-            {account.followersDelta || '+12.4%'}
-          </span>
-        </div>
-
-        {/* Token Diagnostics & Quota */}
+        {/* Token Diagnostics */}
         <div className="account-diagnostics-grid">
           <div className="diag-item">
             <span className="diag-label">
-              <Clock size={11} className="inline-icon" /> Token Expiry
+              <Clock size={11} className="inline-icon" /> Token Health
             </span>
-            <strong className={`diag-val ${isExpired ? 'text-danger' : isExpiringSoon ? 'text-warning' : ''}`}>
-              {isExpired ? 'Expired' : `${account.tokenDaysRemaining} Days Left`}
+            <strong className={`diag-val ${isExpired ? 'text-danger' : isExpiringSoon ? 'text-warning' : 'text-emerald'}`}>
+              {isExpired ? 'Expired' : `${account.tokenDaysRemaining} Days Active`}
             </strong>
           </div>
 
           <div className="diag-item">
             <span className="diag-label">
-              <Activity size={11} className="inline-icon" /> API Quota
+              <Key size={11} className="inline-icon" /> Scopes Granted
             </span>
-            <strong className="diag-val">{account.apiQuotaUsage || '18%'}</strong>
+            <strong className="diag-val">{account.scopes?.length || 2} Capabilities</strong>
           </div>
-        </div>
-
-        {/* Scopes Preview */}
-        <div className="scopes-preview-row">
-          <Key size={11} className="text-muted" />
-          <span className="scopes-count-text">
-            {account.scopes?.length || 3} Authorized OAuth Permissions
-          </span>
-          <span className="last-sync-time">Synced {account.lastSync}</span>
         </div>
 
         {/* Action Buttons */}
         <div className="card-actions-footer">
-          {isExpired || isExpiringSoon ? (
-            <button
-              type="button"
-              className="btn-reconnect-primary"
-              onClick={() => onReconnectAccount(account.id)}
-            >
-              <RefreshCw size={13} />
-              <span>Reconnect OAuth</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn-sync-action"
-              onClick={() => onSyncAccount(account.id)}
-              title="Sync metrics and token status"
-            >
-              <RefreshCw size={13} />
-              <span>Sync</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-sync-action"
+            onClick={() => onReconnectAccount ? onReconnectAccount(account.id) : onSyncAccount(account.id)}
+            title="Refresh Token & State"
+          >
+            <RefreshCw size={13} />
+            <span>Refresh</span>
+          </button>
 
           <button
             type="button"
             className="btn-inspect-action"
             onClick={() => onInspectAccount(account)}
-            title="Inspect OAuth Scopes & Diagnostics"
+            title="Inspect OAuth Scopes & Details"
           >
             <Shield size={13} />
-            <span>Permissions</span>
+            <span>Details</span>
           </button>
 
           <button
             type="button"
             className="btn-disconnect-action"
             onClick={() => onDisconnectAccount(account.id)}
-            title="Disconnect Channel"
+            title="Disconnect Social Asset"
           >
             <Trash2 size={13} />
           </button>

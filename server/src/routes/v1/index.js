@@ -18,6 +18,7 @@ import { contractRoutes } from './contractRoutes.js';
 import { aiRoutes } from './aiRoutes.js';
 import { actionRoutes } from './actionRoutes.js';
 import { webhookRoutes } from './webhookRoutes.js';
+import { socialAccountRoutes } from './socialAccountRoutes.js';
 
 export const v1Router = Router();
 
@@ -36,5 +37,6 @@ v1Router.use('/contracts', contractRoutes);
 v1Router.use('/ai', aiRoutes);
 v1Router.use('/actions', actionRoutes);
 v1Router.use('/webhooks', webhookRoutes);
+v1Router.use('/social-accounts', socialAccountRoutes);
 
 export default v1Router;

@@ -1,17 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Share2,
-  Plus,
-  RefreshCw,
+  PlusCircle,
+  Search,
   LayoutGrid,
   List,
-  Building,
-  Filter,
-  Search,
-  CheckCircle2,
-  AlertTriangle,
+  RefreshCw,
+  SlidersHorizontal,
 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
+import { clientsService } from '../../services/clientsService.js';
 
 export function SocialHeader({
   viewMode,
@@ -24,139 +21,157 @@ export function SocialHeader({
   onStatusChange,
   searchQuery,
   onSearchChange,
-  onSyncAll,
   onOpenConnectModal,
-  isSyncingAll,
+  onRefresh,
+  isRefreshing,
 }) {
-  const platforms = ['all', 'Instagram', 'Facebook', 'LinkedIn', 'YouTube', 'TikTok'];
-  const statuses = ['all', 'Connected', 'Needs Re-auth', 'Expiring Soon'];
+  const [clients, setClients] = useState([]);
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const clientList = await clientsService.getClients();
+      setClients(clientList);
+    } catch (e) {
+      console.error('Failed to load clients in social header:', e);
+    }
+  };
+
+  const platformsList = [
+    { value: 'all', label: 'All Channels' },
+    { value: 'META', label: 'Meta (FB & IG)' },
+    { value: 'FACEBOOK', label: 'Facebook Pages' },
+    { value: 'INSTAGRAM', label: 'Instagram Business' },
+    { value: 'GOOGLE_BUSINESS', label: 'Google Business Profile' },
+    { value: 'YOUTUBE', label: 'YouTube Channels' },
+    { value: 'LINKEDIN', label: 'LinkedIn Company' },
+  ];
 
   return (
     <div className="social-header-container">
       {/* Top Banner */}
       <div className="social-top-banner">
-        <div className="social-title-block">
-          <div className="social-badge-tag">
+        <div className="social-title-box">
+          <div className="social-badge">
             <Share2 size={14} />
-            <span>Multi-Channel OAuth & Health Hub</span>
+            <span>Multi-Tenant Channel Access & OAuth Gateway</span>
           </div>
-          <h1 className="social-main-title">Connected Social Accounts</h1>
-          <p className="social-subtitle-text">
-            Monitor API health status, refresh expiring OAuth tokens, audit permissions, and connect client publishing endpoints.
+          <h1 className="social-main-title">Social Accounts & Platform Connections</h1>
+          <p className="social-subtext">
+            Manage authenticated social media channel assets, page tokens, and publishing permissions bound to client workspaces.
           </p>
         </div>
 
-        <div className="social-banner-actions">
-          {/* View Mode Toggle */}
-          <div className="view-mode-tabs-group" role="group" aria-label="View Mode">
-            <button
-              type="button"
-              className={`view-tab-btn ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('grid')}
-            >
-              <LayoutGrid size={15} />
-              <span>Cards Grid</span>
-            </button>
-            <button
-              type="button"
-              className={`view-tab-btn ${viewMode === 'table' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('table')}
-            >
-              <List size={15} />
-              <span>Audit Table</span>
-            </button>
-          </div>
-
+        <div className="social-header-actions">
           <button
             type="button"
             className="btn-saas-secondary"
-            onClick={onSyncAll}
-            disabled={isSyncingAll}
-            title="Sync all account credentials and followers"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh database records"
+            aria-label="Refresh database records"
           >
-            <RefreshCw size={15} className={isSyncingAll ? 'spin-icon' : ''} />
-            <span>{isSyncingAll ? 'Syncing...' : 'Sync All Accounts'}</span>
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
           <button
             type="button"
-            className="btn-connect-account-primary"
+            className="btn-add-client-primary"
             onClick={onOpenConnectModal}
           >
-            <Plus size={16} />
-            <span>Connect New Account</span>
+            <PlusCircle size={16} />
+            <span>Connect Channel Asset</span>
           </button>
         </div>
       </div>
 
       {/* Toolbar & Filters */}
-      <div className="social-toolbar-card">
-        <div className="toolbar-controls-row">
-          {/* Search Box */}
-          <div className="social-search-field-box">
-            <Search size={14} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search by handle, brand, or client name..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="social-search-input"
-            />
-          </div>
+      <div className="team-toolbar-row">
+        {/* Search */}
+        <div className="team-search-wrapper">
+          <Search size={16} className="search-icon-muted" />
+          <input
+            type="text"
+            placeholder="Search by channel, handle, or client workspace..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="team-search-input"
+          />
+        </div>
 
-          {/* Client Filter */}
-          <div className="social-select-wrapper">
-            <Building size={14} className="icon-muted" />
-            <select
-              value={selectedClient}
-              onChange={(e) => onClientChange(e.target.value)}
-              className="social-select-field"
-              aria-label="Filter by Client Account"
-            >
-              <option value="all">🏢 All Client Accounts</option>
-              {mockClients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Client Filter */}
+        <div className="team-filter-select-wrapper">
+          <select
+            value={selectedClient}
+            onChange={(e) => onClientChange(e.target.value)}
+            className="team-filter-select"
+            aria-label="Filter by Client"
+          >
+            <option value="all">All Client Workspaces</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name || c.clientName}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          {/* Platform Filter */}
-          <div className="social-select-wrapper">
-            <Share2 size={14} className="icon-muted" />
-            <select
-              value={selectedPlatform}
-              onChange={(e) => onPlatformChange(e.target.value)}
-              className="social-select-field"
-              aria-label="Filter by Platform"
-            >
-              <option value="all">🌐 All Platforms</option>
-              {platforms.filter((p) => p !== 'all').map((plat) => (
-                <option key={plat} value={plat}>
-                  {plat}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Platform Filter */}
+        <div className="team-filter-select-wrapper">
+          <select
+            value={selectedPlatform}
+            onChange={(e) => onPlatformChange(e.target.value)}
+            className="team-filter-select"
+            aria-label="Filter by Platform"
+          >
+            {platformsList.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          {/* Health Status Filter */}
-          <div className="social-select-wrapper">
-            <Filter size={14} className="icon-muted" />
-            <select
-              value={selectedStatus}
-              onChange={(e) => onStatusChange(e.target.value)}
-              className="social-select-field"
-              aria-label="Filter by Health Status"
-            >
-              <option value="all">⚡ All Health States</option>
-              {statuses.filter((s) => s !== 'all').map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Status Filter */}
+        <div className="team-filter-select-wrapper">
+          <select
+            value={selectedStatus}
+            onChange={(e) => onStatusChange(e.target.value)}
+            className="team-filter-select"
+            aria-label="Filter by Status"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Active">Active & Healthy</option>
+            <option value="Needs Re-auth">Needs Re-auth</option>
+            <option value="Expiring Soon">Expiring Soon</option>
+            <option value="Disconnected">Disconnected</option>
+          </select>
+        </div>
+
+        {/* View Toggle */}
+        <div className="team-view-toggle-group">
+          <button
+            type="button"
+            className={`team-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            onClick={() => onViewModeChange('grid')}
+            title="Grid View"
+          >
+            <LayoutGrid size={15} />
+            <span>Cards</span>
+          </button>
+          <button
+            type="button"
+            className={`team-view-btn ${viewMode === 'table' ? 'active' : ''}`}
+            onClick={() => onViewModeChange('table')}
+            title="Table View"
+          >
+            <List size={15} />
+            <span>Table</span>
+          </button>
         </div>
       </div>
     </div>
