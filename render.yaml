@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: antigravity-agency-platform
+    env: node
+    plan: standard
+    buildCommand: npm install && node server/src/config/migrate.js && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: http://localhost:5173
+      - key: CORS_ORIGIN
+        value: http://localhost:5173
+
+databases:
+  - name: antigravity-postgres
+    plan: standard
+    databaseName: antigravity_agency
+    user: antigravity_user

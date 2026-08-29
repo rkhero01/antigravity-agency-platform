@@ -6,10 +6,26 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server/src/server.js",
+    "server:dev": "node server/src/server.js",
+    "server:test": "node server/tests/server.test.js",
+    "test:smoke": "node server/tests/production_smoke_test.js",
+    "test:live": "node server/tests/live_postgresql_verification.js",
+    "test:all": "node server/tests/server.test.js && node server/tests/production_smoke_test.js && node server/tests/live_postgresql_verification.js && node test_audit_suite.mjs",
+    "db:validate": "node -e \"import('./server/src/config/database.js').then(m => console.log('Database configuration valid:', m.database.getHealth().status))\"",
+    "db:generate": "prisma generate --schema=server/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=server/prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=server/prisma/schema.prisma",
+    "db:seed": "node server/prisma/seed.js",
+    "db:studio": "prisma studio --schema=server/prisma/schema.prisma"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "lucide-react": "^1.16.0",
+    "pg": "^8.23.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -17,6 +33,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "prisma": "^8.0.0-rc.12",
     "vite": "^6.2.0"
   }
 }

@@ -1,0 +1,142 @@
+export const initialMockSettings = {
+  general: {
+    agencyName: 'Pulse Digital Marketing Operating System',
+    legalEntity: 'Pulse Marketing Agency LLC',
+    supportEmail: 'ops@agency.pulse',
+    phone: '+1 (512) 849-2041',
+    website: 'https://pulseagency.ai',
+    primaryTimezone: 'America/New_York',
+    currency: 'USD ($)',
+    dateFormat: 'YYYY-MM-DD',
+    whiteLabelDomain: 'app.pulseclientportal.com',
+    customBranding: true,
+  },
+
+  aiEngine: {
+    defaultModel: 'gemini-2.5-pro',
+    temperature: 0.75,
+    maxTokens: 2048,
+    defaultTone: 'Engaging, modern, conversion-driven',
+    guardrailsEnabled: true,
+    autoHashtags: true,
+    monthlyTokenQuota: 2000000,
+    tokensUsedThisMonth: 1428500,
+    models: [
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'Google DeepMind', status: 'Active (Recommended)' },
+      { id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet', provider: 'Anthropic', status: 'Active' },
+      { id: 'gpt-4o', name: 'GPT-4o Omnichannel', provider: 'OpenAI', status: 'Active' },
+    ],
+  },
+
+  integrations: [
+    {
+      id: 'int-meta',
+      name: 'Meta Business Suite & Instagram Graph API',
+      provider: 'Meta Platforms Inc.',
+      category: 'Social & Ads',
+      status: 'Connected',
+      appId: 'app_meta_99482710384',
+      lastSync: 'Syncing every 5m',
+      icon: 'meta',
+    },
+    {
+      id: 'int-google',
+      name: 'Google Ads & Business Profile API',
+      provider: 'Google LLC',
+      category: 'Paid Search & Local',
+      status: 'Connected',
+      appId: 'gads_client_5839201948',
+      lastSync: 'Syncing every 15m',
+      icon: 'google',
+    },
+    {
+      id: 'int-linkedin',
+      name: 'LinkedIn Marketing Developer API',
+      provider: 'LinkedIn Corporation',
+      category: 'B2B Social & Ads',
+      status: 'Connected',
+      appId: 'li_app_3849102847',
+      lastSync: 'Syncing every 1h',
+      icon: 'linkedin',
+    },
+    {
+      id: 'int-youtube',
+      name: 'YouTube Data v3 API',
+      provider: 'Google LLC',
+      category: 'Video Publishing',
+      status: 'Connected',
+      appId: 'yt_data_2849201847',
+      lastSync: 'Syncing every 30m',
+      icon: 'youtube',
+    },
+    {
+      id: 'int-tiktok',
+      name: 'TikTok for Business API',
+      provider: 'ByteDance Ltd.',
+      category: 'Short Video Ads',
+      status: 'Ready to Connect',
+      appId: 'Not configured',
+      lastSync: 'Disconnected',
+      icon: 'tiktok',
+    },
+  ],
+
+  webhooks: [
+    {
+      id: 'wh-1',
+      name: 'Post Publishing Dispatcher',
+      url: 'https://api.pulseagency.ai/v1/webhooks/publish-event',
+      events: ['post.published', 'post.scheduled'],
+      status: 'Active',
+      lastTriggered: '24 minutes ago (200 OK)',
+    },
+    {
+      id: 'wh-2',
+      name: 'Client Sign-off Notification Webhook',
+      url: 'https://hooks.slack.com/services/T00/B00/X0019482910',
+      events: ['approval.requested', 'approval.approved'],
+      status: 'Active',
+      lastTriggered: '2 hours ago (200 OK)',
+    },
+  ],
+
+  brandKitDefaults: {
+    primaryColor: '#6366f1',
+    secondaryColor: '#06b6d4',
+    accentColor: '#ec4899',
+    fontFamily: 'Outfit, sans-serif',
+    watermarkText: 'PulseAI Marketing OS • Agency Confidential',
+    footerDisclaimer: 'Prepared exclusively for authorized agency client stakeholders.',
+  },
+
+  notifications: {
+    emailPostApproval: true,
+    emailTaskAssigned: true,
+    emailBudgetAlerts: true,
+    emailWeeklyDigest: true,
+    slackRealtimeAlerts: true,
+    budgetThresholdPercent: 85,
+    notifyClientsDirectly: true,
+  },
+
+  billing: {
+    currentPlan: 'Enterprise Agency Tier',
+    price: '$499 / month',
+    billingCycle: 'Annual (Billed Yearly - $5,388/yr)',
+    nextBillingDate: '2027-01-15',
+    paymentMethod: 'Visa ending in 4242 (Exp 12/28)',
+    usage: {
+      clientWorkspaces: { current: 6, max: 10, label: '6 / 10 Client Workspaces' },
+      aiTokens: { current: 1428500, max: 2000000, label: '1.43M / 2.0M Monthly AI Tokens' },
+      teamSeats: { current: 6, max: 15, label: '6 / 15 Staff Seats' },
+      socialChannels: { current: 18, max: 50, label: '18 / 50 Connected Channels' },
+    },
+    invoices: [
+      { id: 'inv-2026-08', date: '2026-08-01', amount: '$499.00', status: 'Paid', downloadUrl: '#' },
+      { id: 'inv-2026-07', date: '2026-07-01', amount: '$499.00', status: 'Paid', downloadUrl: '#' },
+      { id: 'inv-2026-06', date: '2026-06-01', amount: '$499.00', status: 'Paid', downloadUrl: '#' },
+    ],
+  },
+};
+
+export const mockSettings = initialMockSettings;

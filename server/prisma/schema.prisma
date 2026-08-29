@@ -1,0 +1,696 @@
+// ==============================================================================
+// PRISMA SCHEMA DEFINITION — ANTIGRAVITY AGENCY INTELLIGENCE PLATFORM
+// Target Database: PostgreSQL
+// Task 28 — Step 5: Production-Grade Hardened Data Layer
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------------------
+// 1. TENANT & IDENTITY MANAGEMENT
+// ------------------------------------------------------------------------------
+
+model Agency {
+  id          String       @id @default(uuid())
+  name        String
+  domain      String?      @unique
+  plan        String       @default("ENTERPRISE")
+  status      String       @default("ACTIVE") // ACTIVE, SUSPENDED, TRIAL
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  // Relationships
+  users                User[]
+  clients              Client[]
+  teamMembers          TeamMember[]
+  contacts             Contact[]
+  leads                Lead[]
+  campaigns            Campaign[]
+  apiProviders         APIProvider[]
+  aiActions            AIAction[]
+  aiInsights           AIInsight[]
+  aiRecommendations    AIRecommendation[]
+  aiAnomalies          AIAnomaly[]
+  telemetryEvents      TelemetryEvent[]
+  webhookEvents        WebhookEvent[]
+  conversations        Conversation[]
+  conversationMessages ConversationMessage[]
+  whatsappTemplates    WhatsAppTemplate[]
+  whatsappAutomations  WhatsAppAutomation[]
+  followUps            FollowUp[]
+  seoKeywords          SEOKeyword[]
+  seoTasks             SEOTask[]
+  contracts            Contract[]
+  invoices             Invoice[]
+  auditLogs            AuditLog[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model User {
+  id           String      @id @default(uuid())
+  agencyId     String
+  email        String      @unique
+  passwordHash String
+  name         String
+  role         String      @default("OPERATOR") // OWNER, ADMIN, MANAGER, OPERATOR, ANALYST, VIEWER
+  status       String      @default("ACTIVE")
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  // Relations
+  agency          Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  actionsApproved AIAction[]  @relation("ActionApprover")
+  auditLogs       AuditLog[]
+
+  @@index([agencyId])
+  @@index([email])
+}
+
+model TeamMember {
+  id           String      @id @default(uuid())
+  agencyId     String
+  name         String
+  email        String
+  role         String
+  department   String
+  shiftHours   String      @default("09:00 - 18:00")
+  status       String      @default("ACTIVE")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  agency       Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([email])
+}
+
+// ------------------------------------------------------------------------------
+// 2. CLIENT MANAGEMENT
+// ------------------------------------------------------------------------------
+
+model Client {
+  id               String       @id @default(uuid())
+  agencyId         String
+  externalId       String?
+  clientName       String
+  industry         String
+  monthlyRetainer  Float        @default(0)
+  tier             String       @default("STANDARD")
+  healthScore      Int          @default(90)
+  primaryContact   String?
+  contactEmail     String?
+  status           String       @default("ACTIVE")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  agency              Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  leads               Lead[]
+  contacts            Contact[]
+  campaigns           Campaign[]
+  conversations       Conversation[]
+  whatsappAutomations WhatsAppAutomation[]
+  whatsappTemplates   WhatsAppTemplate[]
+  followUps           FollowUp[]
+  seoKeywords         SEOKeyword[]
+  seoTasks            SEOTask[]
+  contracts           Contract[]
+  invoices            Invoice[]
+  aiInsights          AIInsight[]
+  aiRecommendations   AIRecommendation[]
+  aiAnomalies         AIAnomaly[]
+  aiActions           AIAction[]
+  auditLogs           AuditLog[]
+
+  @@index([agencyId])
+  @@index([status])
+  @@index([clientName])
+}
+
+model Contact {
+  id          String    @id @default(uuid())
+  agencyId    String
+  clientId    String
+  name        String
+  phone       String?
+  email       String?
+  source      String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  agency      Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+}
+
+// ------------------------------------------------------------------------------
+// 3. CRM & SALES PIPELINE
+// ------------------------------------------------------------------------------
+
+model Lead {
+  id              String    @id @default(uuid())
+  agencyId        String
+  clientId        String
+  name            String
+  company         String?
+  email           String?
+  phone           String?
+  source          String?   @default("DIRECT")
+  stage           String    @default("NEW") // NEW, CONTACTED, QUALIFIED, PROPOSAL_SENT, WON, LOST
+  score           Int       @default(50)
+  value           Float     @default(0)
+  owner           String?
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  agency          Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([stage])
+  @@index([status])
+}
+
+// ------------------------------------------------------------------------------
+// 4. CAMPAIGNS & PAID MEDIA
+// ------------------------------------------------------------------------------
+
+model Campaign {
+  id              String           @id @default(uuid())
+  agencyId        String
+  clientId        String
+  platform        String           // META, GOOGLE, LINKEDIN
+  name            String
+  objective       String           @default("LEAD_GENERATION")
+  dailyBudget     Float            @default(0)
+  totalSpend      Float            @default(0)
+  impressions     Int              @default(0)
+  clicks          Int              @default(0)
+  conversions     Int              @default(0)
+  revenue         Float            @default(0)
+  status          String           @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  agency          Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  metrics         CampaignMetric[]
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([platform])
+  @@index([status])
+}
+
+model CampaignMetric {
+  id           String    @id @default(uuid())
+  campaignId   String
+  impressions  Int       @default(0)
+  clicks       Int       @default(0)
+  conversions  Int       @default(0)
+  spend        Float     @default(0)
+  revenue      Float     @default(0)
+  roas         Float     @default(0)
+  recordedDate DateTime  @default(now())
+
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([recordedDate])
+}
+
+// ------------------------------------------------------------------------------
+// 5. WHATSAPP & CONVERSATIONS
+// ------------------------------------------------------------------------------
+
+model Conversation {
+  id             String    @id @default(uuid())
+  agencyId       String
+  clientId       String
+  contactId      String?
+  contactPhone   String
+  contactName    String
+  unreadCount    Int       @default(0)
+  channel        String    @default("WHATSAPP")
+  status         String    @default("OPEN") // OPEN, PENDING, RESOLVED, CLOSED
+  assignedTo     String?
+  tags           String?   // JSON array or comma separated
+  lastMessage    String?
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  agency         Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client         Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messages       ConversationMessage[]
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+model ConversationMessage {
+  id             String    @id @default(uuid())
+  agencyId       String
+  conversationId String
+  direction      String    @default("INBOUND") // INBOUND, OUTBOUND
+  messageType    String    @default("text")    // text, template, image, document, interactive
+  body           String
+  externalId     String?   @unique
+  status         String    @default("SENT")    // QUEUED, SENT, DELIVERED, READ, FAILED, RECEIVED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  agency         Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([conversationId])
+  @@index([status])
+}
+
+model WhatsAppTemplate {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String?
+  name         String
+  category     String    @default("MARKETING") // MARKETING, UTILITY, AUTHENTICATION
+  language     String    @default("en")
+  body         String
+  variables    String?   // JSON representation of placeholder variables
+  status       String    @default("APPROVED")  // DRAFT, PENDING, APPROVED, REJECTED, DISABLED
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([category])
+  @@index([status])
+}
+
+model WhatsAppAutomation {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String?
+  name         String
+  description  String?
+  triggerType  String    @default("KEYWORD_MATCH") // KEYWORD_MATCH, LEAD_CREATED, CART_ABANDONED, STATUS_CHANGE
+  actionType   String    @default("SEND_TEMPLATE") // SEND_TEMPLATE, ASSIGN_AGENT, ADD_TAG
+  status       String    @default("ACTIVE")        // DRAFT, ACTIVE, PAUSED, ARCHIVED
+  steps        String?   // JSON array of sequence steps
+  delayMinutes Int       @default(0)
+  conditions   String?   // JSON conditions
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([status])
+}
+
+model FollowUp {
+  id             String    @id @default(uuid())
+  agencyId       String
+  clientId       String
+  leadId         String?
+  contactId      String?
+  conversationId String?
+  assignedTo     String?
+  contactPhone   String?
+  scheduledAt    DateTime  @default(now())
+  note           String?
+  channel        String    @default("WHATSAPP") // WHATSAPP, CALL, EMAIL, SMS, OTHER
+  status         String    @default("PENDING")  // PENDING, COMPLETED, CANCELLED, OVERDUE
+  priority       String    @default("MEDIUM")   // LOW, MEDIUM, HIGH, CRITICAL
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  agency         Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+// ------------------------------------------------------------------------------
+// 6. SEO & ORGANIC GROWTH
+// ------------------------------------------------------------------------------
+
+model SEOKeyword {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String
+  keyword      String
+  searchVolume Int       @default(0)
+  difficulty   Int       @default(0)
+  currentRank  Int       @default(100)
+  previousRank Int       @default(100)
+  targetRank   Int       @default(10)
+  url          String?
+  searchIntent String    @default("INFORMATIONAL") // INFORMATIONAL, COMMERCIAL, TRANSACTIONAL, NAVIGATIONAL
+  status       String    @default("TRACKING")      // TRACKING, IMPROVING, DECLINING, ACHIEVED, PAUSED
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model SEOTask {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String
+  keywordId    String?
+  title        String
+  description  String?
+  assignedTo   String?
+  priority     String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  dueDate      DateTime?
+  status       String    @default("TODO")   // TODO, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED
+  completion   Int       @default(0)        // percentage 0 - 100
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+}
+
+// ------------------------------------------------------------------------------
+// 7. CONTRACTS & BILLING
+// ------------------------------------------------------------------------------
+
+model Contract {
+  id             String    @id @default(uuid())
+  agencyId       String
+  clientId       String
+  contractNumber String
+  title          String    @default("Retainer Agreement")
+  startDate      DateTime  @default(now())
+  endDate        DateTime
+  value          Float     @default(0)
+  billingCycle   String    @default("MONTHLY") // MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY, ONE_TIME
+  status         String    @default("ACTIVE")  // DRAFT, ACTIVE, EXPIRED, CANCELLED, PENDING_RENEWAL
+  renewalDate    DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  agency         Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoices       Invoice[]
+
+  @@unique([agencyId, contractNumber])
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model Invoice {
+  id            String    @id @default(uuid())
+  agencyId      String
+  clientId      String
+  contractId    String?
+  invoiceNumber String
+  issueDate     DateTime  @default(now())
+  dueDate       DateTime
+  subtotal      Float     @default(0)
+  tax           Float     @default(0)
+  discount      Float     @default(0)
+  total         Float     @default(0)
+  amountPaid    Float     @default(0)
+  balanceDue    Float     @default(0)
+  currency      String    @default("INR")
+  status        String    @default("ISSUED") // DRAFT, ISSUED, PARTIALLY_PAID, PAID, OVERDUE, CANCELLED
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  agency        Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contract      Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@unique([agencyId, invoiceNumber])
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// ------------------------------------------------------------------------------
+// 8. AI INTELLIGENCE & ACTION ORCHESTRATION
+// ------------------------------------------------------------------------------
+
+model AIInsight {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String
+  title        String
+  category     String
+  impact       String
+  confidence   Float     @default(0.95)
+  status       String    @default("ACTIVE") // ACTIVE, DISMISSED, SNOOZED
+  createdAt    DateTime  @default(now())
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model AIRecommendation {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String
+  title        String
+  priority     String    @default("P1")
+  actionType   String
+  expectedGain String
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([priority])
+}
+
+model AIAnomaly {
+  id           String    @id @default(uuid())
+  agencyId     String
+  clientId     String
+  metric       String
+  variance     String
+  severity     String    @default("HIGH")
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([clientId])
+}
+
+model AIAction {
+  id                String              @id @default(uuid())
+  agencyId          String
+  clientId          String
+  actionType        String
+  title             String
+  priority          String              @default("P1") // P0, P1, P2, P3
+  lifecycleState    String              @default("REVIEW_REQUIRED") // DISCOVERED, REVIEW_REQUIRED, APPROVED, EXECUTING, COMPLETED, FAILED, ROLLED_BACK, REJECTED, SNOOZED
+  requiresApproval  Boolean             @default(true)
+  approvedById      String?
+  approvedAt        DateTime?
+  idempotencyKey    String
+  beforeStateJson   String?             // Serialized before-state
+  proposedStateJson String?             // Serialized proposed-state
+  rollbackStateJson String?             // Serialized rollback-state
+  expectedImpact    String?
+  executionMode     String              @default("DEMO") // DEMO, REAL
+  executionResult   String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  agency            Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client            Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  approvedBy        User?               @relation("ActionApprover", fields: [approvedById], references: [id])
+  executions        AIActionExecution[]
+  auditLogs         AIActionAuditLog[]
+
+  @@unique([agencyId, idempotencyKey])
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([lifecycleState])
+  @@index([priority])
+}
+
+model AIActionExecution {
+  id           String    @id @default(uuid())
+  actionId     String
+  provider     String    @default("DemoProvider")
+  mode         String    @default("DEMO") // DEMO, REAL
+  status       String    @default("COMPLETED")
+  requestId    String
+  durationMs   Int       @default(0)
+  errorCode    String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  action       AIAction  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId])
+  @@index([requestId])
+}
+
+model AIActionAuditLog {
+  id           String    @id @default(uuid())
+  actionId     String
+  actorId      String?
+  event        String    // CREATED, APPROVED, EXECUTED, ROLLED_BACK, REJECTED
+  oldState     String?
+  newState     String?
+  metadataJson String?
+  requestId    String
+  timestamp    DateTime  @default(now())
+
+  action       AIAction  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId])
+}
+
+// ------------------------------------------------------------------------------
+// 9. MUTATION AUDIT LOGGING
+// ------------------------------------------------------------------------------
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  agencyId     String
+  actorId      String?
+  clientId     String?
+  action       String    // CREATE, UPDATE, DELETE, EXECUTE, ROLLBACK, AUTH_LOGIN, AUTH_LOGOUT
+  entityType   String
+  entityId     String
+  beforeJson   String?
+  afterJson    String?
+  requestId    String
+  ipAddress    String?
+  userAgent    String?
+  timestamp    DateTime  @default(now())
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  actor        User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([actorId])
+  @@index([clientId])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+}
+
+// ------------------------------------------------------------------------------
+// 10. API PROVIDERS, WEBHOOKS & TELEMETRY
+// ------------------------------------------------------------------------------
+
+model APIProvider {
+  id           String    @id @default(uuid())
+  agencyId     String
+  providerType String    // META_WHATSAPP, META_ADS, GOOGLE_ADS, CRM, SEO
+  name         String
+  status       String    @default("SANDBOX_ACTIVE") // SANDBOX_ACTIVE, CONNECTED, NOT_CONFIGURED, ERROR
+  mode         String    @default("DEMO") // DEMO, REAL
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, providerType])
+  @@index([agencyId])
+}
+
+model WebhookEvent {
+  id           String    @id @default(uuid())
+  agencyId     String
+  provider     String    // META, GOOGLE, CRM
+  eventId      String    // External webhook event id for deduplication
+  eventType    String
+  payloadJson  String
+  status       String    @default("PROCESSED")
+  processedAt  DateTime  @default(now())
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, eventId])
+  @@index([agencyId])
+  @@index([provider])
+}
+
+model TelemetryEvent {
+  id           String    @id @default(uuid())
+  agencyId     String
+  userId       String?
+  actionId     String?
+  requestId    String
+  provider     String
+  eventType    String
+  status       String
+  durationMs   Int       @default(0)
+  metadataJson String?
+  timestamp    DateTime  @default(now())
+
+  agency       Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([requestId])
+}
