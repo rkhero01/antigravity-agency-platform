@@ -12,5 +12,7 @@ export const authRoutes = Router();
 authRoutes.post('/login', authController.login);
 authRoutes.post('/logout', authController.logout);
 authRoutes.get('/me', requireAuthentication, authController.me);
+authRoutes.patch('/profile', requireAuthentication, authController.updateProfile);
+authRoutes.post('/change-password', requireAuthentication, authController.changePassword);
 
 export default authRoutes;

@@ -1,24 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   SettingsHeader,
-  GeneralSettingsTab,
-  AIEngineSettingsTab,
-  IntegrationsSettingsTab,
-  BrandKitSettingsTab,
-  NotificationsSettingsTab,
-  BillingSettingsTab,
+  AgencyProfileTab,
+  UserProfileTab,
+  SecuritySettingsTab,
+  WorkspacePreferencesTab,
 } from '../../components/settings/index.js';
 import { settingsService } from '../../services/settingsService.js';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
-export function SettingsPage({
-  activeClient = 'all',
-  onNavigate,
-}) {
-  const [activeTab, setActiveTab] = useState('general');
+export function SettingsPage({ activeClient = 'all', onNavigate }) {
+  const [activeTab, setActiveTab] = useState('agency'); // 'agency' | 'user' | 'security' | 'preferences'
   const [settings, setSettings] = useState(null);
-  const [isDirty, setIsDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   useEffect(() => {
@@ -32,83 +28,64 @@ export function SettingsPage({
     }, 3500);
   };
 
-  const loadSettings = async () => {
-    setLoading(true);
-    const data = await settingsService.getSettings();
-    setSettings(data);
-    setLoading(false);
+  const loadSettings = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setIsRefreshing(true);
+    setError(null);
+
+    try {
+      const data = await settingsService.getSettings();
+      setSettings(data);
+    } catch (err) {
+      console.error('Failed to load settings from database:', err);
+      setError(
+        err.message ||
+          'Unable to connect to database or retrieve agency profile. Please check connection and retry.'
+      );
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
-  const handleSectionChange = (sectionKey, newValues) => {
+  const handleSaveAgency = async (agencyUpdates) => {
+    const updated = await settingsService.updateAgencyProfile(agencyUpdates);
     setSettings((prev) => ({
       ...prev,
-      [sectionKey]: newValues,
+      agency: {
+        ...prev.agency,
+        ...updated,
+      },
     }));
-    setIsDirty(true);
+    showToast('✨ Agency workspace profile updated in PostgreSQL!');
   };
 
-  const handleSaveAll = async () => {
-    if (!settings) return;
-    await settingsService.saveSettings('general', settings.general);
-    await settingsService.saveSettings('aiEngine', settings.aiEngine);
-    await settingsService.saveSettings('brandKitDefaults', settings.brandKitDefaults);
-    await settingsService.saveSettings('notifications', settings.notifications);
-    setIsDirty(false);
-    showToast('✨ All agency settings and configurations saved successfully!');
+  const handleSaveUser = async (userUpdates) => {
+    const updated = await settingsService.updateUserProfile(userUpdates);
+    setSettings((prev) => ({
+      ...prev,
+      user: {
+        ...prev.user,
+        ...updated,
+      },
+    }));
+    showToast('✨ Operator profile updated successfully!');
   };
 
-  const handleDiscard = async () => {
-    await loadSettings();
-    setIsDirty(false);
-    showToast('Reverted unsaved changes to last saved state.');
+  const handleChangePassword = async (currentPassword, newPassword) => {
+    const result = await settingsService.changePassword(
+      currentPassword,
+      newPassword
+    );
+    showToast('🔒 Account password changed successfully!');
+    return result;
   };
-
-  const handleToggleIntegration = async (id) => {
-    const updatedList = await settingsService.toggleIntegration(id);
-    setSettings((prev) => ({ ...prev, integrations: updatedList }));
-    showToast('OAuth Integration status updated.');
-  };
-
-  const handleTestWebhook = async (id) => {
-    await settingsService.testWebhook(id);
-    const refreshed = await settingsService.getSettings();
-    setSettings(refreshed);
-    showToast('🚀 Test ping sent: HTTP 200 OK received from endpoint!');
-  };
-
-  const handleAddWebhook = async (webhookData) => {
-    await settingsService.addWebhook(webhookData);
-    const refreshed = await settingsService.getSettings();
-    setSettings(refreshed);
-    showToast('Webhook endpoint configured and registered.');
-  };
-
-  const handleDeleteWebhook = async (id) => {
-    await settingsService.deleteWebhook(id);
-    const refreshed = await settingsService.getSettings();
-    setSettings(refreshed);
-    showToast('Webhook endpoint removed.');
-  };
-
-  const handleUpgradePlan = () => {
-    showToast('Enterprise plan scaling: Contacting agency account representative...');
-  };
-
-  const handleUpdatePayment = () => {
-    showToast('Stripe billing portal launched (simulated).');
-  };
-
-  const handleDownloadInvoice = (id) => {
-    showToast(`Downloading invoice receipt ${id} (PDF)...`);
-  };
-
-  if (loading || !settings) return null;
 
   return (
     <div className="settings-page-container">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="ai-toast-notification">
+        <div className="ai-toast-notification" role="status">
           <CheckCircle2 size={16} className="text-success" />
           <span>{toastMessage}</span>
         </div>
@@ -118,58 +95,62 @@ export function SettingsPage({
       <SettingsHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onSaveAll={handleSaveAll}
-        onDiscard={handleDiscard}
-        isDirty={isDirty}
+        onRefresh={() => loadSettings(true)}
+        isRefreshing={isRefreshing}
       />
 
-      {/* Tab Panels */}
-      {activeTab === 'general' && (
-        <GeneralSettingsTab
-          data={settings.general}
-          onChange={(newVal) => handleSectionChange('general', newVal)}
-        />
-      )}
+      {/* Main Content Area */}
+      {loading ? (
+        <div className="clients-state-box loading">
+          <div className="clients-loading-spinner" />
+          <p className="clients-state-title">
+            Loading agency workspace and credentials from PostgreSQL...
+          </p>
+          <span className="clients-state-sub">
+            Verifying JWT token & tenant configuration
+          </span>
+        </div>
+      ) : error ? (
+        <div className="clients-state-box error" role="alert">
+          <div className="state-icon-badge error">
+            <AlertCircle size={28} />
+          </div>
+          <h3 className="clients-state-title">Database Connection Error</h3>
+          <p className="clients-state-desc">{error}</p>
+          <button
+            type="button"
+            className="btn-saas-primary"
+            onClick={() => loadSettings(false)}
+          >
+            <RefreshCw size={14} />
+            <span>Retry Connection</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {activeTab === 'agency' && (
+            <AgencyProfileTab
+              agency={settings.agency}
+              currentUser={settings.user}
+              onSaveAgency={handleSaveAgency}
+            />
+          )}
 
-      {activeTab === 'ai-engine' && (
-        <AIEngineSettingsTab
-          data={settings.aiEngine}
-          onChange={(newVal) => handleSectionChange('aiEngine', newVal)}
-        />
-      )}
+          {activeTab === 'user' && (
+            <UserProfileTab
+              user={settings.user}
+              onSaveUser={handleSaveUser}
+            />
+          )}
 
-      {activeTab === 'integrations' && (
-        <IntegrationsSettingsTab
-          integrations={settings.integrations}
-          webhooks={settings.webhooks}
-          onToggleIntegration={handleToggleIntegration}
-          onTestWebhook={handleTestWebhook}
-          onAddWebhook={handleAddWebhook}
-          onDeleteWebhook={handleDeleteWebhook}
-        />
-      )}
+          {activeTab === 'security' && (
+            <SecuritySettingsTab onChangePassword={handleChangePassword} />
+          )}
 
-      {activeTab === 'brandKit' || activeTab === 'brand-kit' ? (
-        <BrandKitSettingsTab
-          data={settings.brandKitDefaults}
-          onChange={(newVal) => handleSectionChange('brandKitDefaults', newVal)}
-        />
-      ) : null}
-
-      {activeTab === 'notifications' && (
-        <NotificationsSettingsTab
-          data={settings.notifications}
-          onChange={(newVal) => handleSectionChange('notifications', newVal)}
-        />
-      )}
-
-      {activeTab === 'billing' && (
-        <BillingSettingsTab
-          data={settings.billing}
-          onUpgradePlan={handleUpgradePlan}
-          onUpdatePayment={handleUpdatePayment}
-          onDownloadInvoice={handleDownloadInvoice}
-        />
+          {activeTab === 'preferences' && (
+            <WorkspacePreferencesTab preferences={settings.preferences} />
+          )}
+        </>
       )}
     </div>
   );

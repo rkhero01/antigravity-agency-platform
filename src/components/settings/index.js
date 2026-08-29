@@ -1,7 +1,11 @@
-export * from './SettingsHeader.jsx';
-export * from './GeneralSettingsTab.jsx';
-export * from './AIEngineSettingsTab.jsx';
-export * from './IntegrationsSettingsTab.jsx';
-export * from './BrandKitSettingsTab.jsx';
-export * from './NotificationsSettingsTab.jsx';
-export * from './BillingSettingsTab.jsx';
+export { SettingsHeader } from './SettingsHeader.jsx';
+export { AgencyProfileTab } from './AgencyProfileTab.jsx';
+export { UserProfileTab } from './UserProfileTab.jsx';
+export { SecuritySettingsTab } from './SecuritySettingsTab.jsx';
+export { WorkspacePreferencesTab } from './WorkspacePreferencesTab.jsx';
+export { GeneralSettingsTab } from './GeneralSettingsTab.jsx';
+export { AIEngineSettingsTab } from './AIEngineSettingsTab.jsx';
+export { IntegrationsSettingsTab } from './IntegrationsSettingsTab.jsx';
+export { BrandKitSettingsTab } from './BrandKitSettingsTab.jsx';
+export { NotificationsSettingsTab } from './NotificationsSettingsTab.jsx';
+export { BillingSettingsTab } from './BillingSettingsTab.jsx';

@@ -29,10 +29,36 @@ export async function me(req, res, next) {
   }
 }
 
+export async function updateProfile(req, res, next) {
+  try {
+    const updated = await authService.updateProfile(req.user.userId, req.user.agencyId, req.body);
+    return sendSuccess(res, { user: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    const result = await authService.changePassword(
+      req.user.userId,
+      req.user.agencyId,
+      currentPassword,
+      newPassword
+    );
+    return sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const authController = {
   login,
   logout,
   me,
+  updateProfile,
+  changePassword,
 };
 
 export default authController;

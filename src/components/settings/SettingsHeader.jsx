@@ -1,87 +1,97 @@
 import React from 'react';
 import {
-  Settings,
-  Building,
-  Sparkles,
-  Plug,
-  Palette,
-  Bell,
-  CreditCard,
-  Save,
-  RotateCcw,
+  Building2,
+  User,
+  Lock,
+  SlidersHorizontal,
+  Settings as SettingsIcon,
+  RefreshCw,
 } from 'lucide-react';
 
 export function SettingsHeader({
   activeTab,
   onTabChange,
-  onSaveAll,
-  onDiscard,
-  isDirty,
+  onRefresh,
+  isRefreshing,
 }) {
   const tabs = [
-    { id: 'general', label: 'Agency Profile', icon: Building },
-    { id: 'ai-engine', label: 'AI Model Engine', icon: Sparkles },
-    { id: 'integrations', label: 'APIs & Webhooks', icon: Plug },
-    { id: 'brand-kit', label: 'Agency Brand Kit', icon: Palette },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'billing', label: 'Billing & Quotas', icon: CreditCard },
+    {
+      id: 'agency',
+      label: 'Agency Workspace',
+      icon: Building2,
+      desc: 'Multi-tenant identity & billing plan',
+    },
+    {
+      id: 'user',
+      label: 'My Profile',
+      icon: User,
+      desc: 'Operator credentials & role',
+    },
+    {
+      id: 'security',
+      label: 'Password & Security',
+      icon: Lock,
+      desc: 'Password changes & JWT session',
+    },
+    {
+      id: 'preferences',
+      label: 'Governance & Preferences',
+      icon: SlidersHorizontal,
+      desc: 'Telemetry & safety gate',
+    },
   ];
 
   return (
-    <div className="settings-header-container">
+    <div className="settings-header-wrapper">
       {/* Top Banner */}
-      <div className="settings-top-banner">
-        <div className="settings-title-block">
-          <div className="settings-badge-tag">
-            <Settings size={14} />
-            <span>Workspace Preferences & Infrastructure</span>
+      <div className="settings-hero-banner">
+        <div className="settings-hero-title-box">
+          <div className="settings-badge-pill">
+            <SettingsIcon size={14} />
+            <span>PostgreSQL Multi-Tenant Workspace & Security</span>
           </div>
-          <h1 className="settings-main-title">Agency & System Settings</h1>
-          <p className="settings-subtitle-text">
-            Configure white-label branding, AI creative engine parameters, API OAuth connections, webhooks, and billing quotas.
+          <h1 className="settings-main-heading">Agency Workspace & Profile Settings</h1>
+          <p className="settings-subheading-text">
+            Configure multi-tenant agency metadata, operator credentials, and cryptographic security safeguards.
           </p>
         </div>
 
-        <div className="settings-banner-actions">
-          {isDirty && (
-            <button
-              type="button"
-              className="btn-saas-secondary"
-              onClick={onDiscard}
-              title="Revert unsaved changes"
-            >
-              <RotateCcw size={15} />
-              <span>Discard</span>
-            </button>
-          )}
-
+        <div className="settings-hero-actions">
           <button
             type="button"
-            className="btn-save-settings-primary"
-            onClick={onSaveAll}
+            className="btn-saas-secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh database records"
+            aria-label="Refresh database records"
           >
-            <Save size={16} />
-            <span>Save All Changes</span>
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
       </div>
 
-      {/* Domain Navigation Tabs */}
-      <div className="settings-nav-tabs-bar" role="tablist">
+      {/* Tabs Navigation */}
+      <div className="settings-tabs-nav-bar" role="tablist">
         {tabs.map((tab) => {
-          const IconComponent = tab.icon;
+          const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              type="button"
               role="tab"
               aria-selected={isActive}
+              type="button"
               className={`settings-nav-tab-btn ${isActive ? 'active' : ''}`}
               onClick={() => onTabChange(tab.id)}
             >
-              <IconComponent size={15} />
-              <span>{tab.label}</span>
+              <div className="tab-btn-icon-box">
+                <Icon size={16} />
+              </div>
+              <div className="tab-btn-text-box">
+                <span className="tab-btn-label">{tab.label}</span>
+                <span className="tab-btn-desc">{tab.desc}</span>
+              </div>
             </button>
           );
         })}

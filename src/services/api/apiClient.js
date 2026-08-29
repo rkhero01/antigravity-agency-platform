@@ -18,6 +18,16 @@ class ApiClient {
     this.token = this.loadStoredToken();
   }
 
+  setBaseUrl(baseUrl) {
+    if (baseUrl) {
+      this.baseUrl = baseUrl.replace(/\/$/, '');
+    }
+  }
+
+  getBaseUrl() {
+    return this.baseUrl;
+  }
+
   loadStoredToken() {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -224,6 +234,8 @@ class ApiClient {
       login: (credentials) => this.post('/api/v1/auth/login', credentials),
       logout: () => this.post('/api/v1/auth/logout'),
       me: () => this.get('/api/v1/auth/me'),
+      updateProfile: (data) => this.patch('/api/v1/auth/profile', data),
+      changePassword: (data) => this.post('/api/v1/auth/change-password', data),
     };
   }
 

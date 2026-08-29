@@ -4,7 +4,7 @@
  */
 
 import { userRepository } from '../repositories/userRepository.js';
-import { verifyPassword } from '../auth/passwordUtils.js';
+import { verifyPassword, hashPassword } from '../auth/passwordUtils.js';
 import { generateToken } from '../auth/tokenUtils.js';
 import { AuthenticationError, NotFoundError } from '../utils/errors.js';
 import { ROLE_PERMISSIONS } from '../middleware/auth.js';
@@ -63,6 +63,52 @@ export class AuthService {
     const { passwordHash, ...safeUser } = user;
     safeUser.permissions = ROLE_PERMISSIONS[user.role] || [];
     return safeUser;
+  }
+
+  async updateProfile(userId, agencyId, updates = {}) {
+    const user = await userRepository.findById(userId, agencyId);
+    if (!user) {
+      throw new NotFoundError('User profile not found');
+    }
+
+    const safeUpdates = {};
+    if (updates.name !== undefined) {
+      const trimmed = String(updates.name).trim();
+      if (trimmed.length < 2) {
+        throw new AuthenticationError('Full name must be at least 2 characters.');
+      }
+      safeUpdates.name = trimmed;
+    }
+
+    const updated = await userRepository.update(userId, safeUpdates, agencyId);
+    const { passwordHash, ...safeUser } = updated;
+    safeUser.permissions = ROLE_PERMISSIONS[updated.role] || [];
+    return safeUser;
+  }
+
+  async changePassword(userId, agencyId, currentPassword, newPassword) {
+    if (!currentPassword || !newPassword) {
+      throw new AuthenticationError('Current password and new password are required');
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      throw new AuthenticationError('New password must be at least 8 characters long');
+    }
+
+    const user = await userRepository.findById(userId, agencyId);
+    if (!user) {
+      throw new NotFoundError('User profile not found');
+    }
+
+    const isMatch = verifyPassword(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new AuthenticationError('Current password is incorrect');
+    }
+
+    const newPasswordHash = hashPassword(newPassword);
+    await userRepository.update(userId, { passwordHash: newPasswordHash }, agencyId);
+
+    return { message: 'Password changed successfully' };
   }
 }
 
