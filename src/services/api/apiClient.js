@@ -82,9 +82,17 @@ class ApiClient {
     }
 
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = cleanEndpoint.startsWith('http')
-      ? `${cleanEndpoint}${queryString}`
-      : `${this.baseUrl}${cleanEndpoint}${queryString}`;
+    let resolvedBase = this.baseUrl;
+    let pathPart = cleanEndpoint;
+
+    if (cleanEndpoint.startsWith('http')) {
+      resolvedBase = '';
+      pathPart = cleanEndpoint;
+    } else if (cleanEndpoint.startsWith('/api/v1') && resolvedBase.endsWith('/api/v1')) {
+      resolvedBase = resolvedBase.replace(/\/api\/v1\/?$/, '');
+    }
+
+    const url = `${resolvedBase}${pathPart}${queryString}`;
 
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), timeout) : null;
