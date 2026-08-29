@@ -104,6 +104,15 @@ export function toDbPayload(formData = {}, isPartial = false) {
     payload.tier = 'STANDARD';
   }
 
+  if (formData.status !== undefined) {
+    const rawStatus = (formData.status || '').toUpperCase();
+    payload.status = ['ACTIVE', 'PAUSED', 'INACTIVE'].includes(rawStatus)
+      ? rawStatus
+      : 'ACTIVE';
+  } else if (!isPartial) {
+    payload.status = 'ACTIVE';
+  }
+
   return payload;
 }
 

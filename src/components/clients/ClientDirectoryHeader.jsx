@@ -1,19 +1,45 @@
 import React from 'react';
-import { Search, Plus, LayoutGrid, List, Filter, Building2 } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  LayoutGrid,
+  List,
+  Building2,
+  RefreshCw,
+  SlidersHorizontal,
+  ArrowUpDown,
+} from 'lucide-react';
 
 export function ClientDirectoryHeader({
   totalCount,
   activeCount,
-  onboardingCount,
   pausedCount,
+  inactiveCount,
   searchQuery,
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  industryFilter,
+  onIndustryFilterChange,
+  sortBy,
+  onSortByChange,
   viewMode,
   onViewModeChange,
   onOpenAddModal,
+  onRefresh,
+  isRefreshing,
 }) {
+  const industries = [
+    'All Industries',
+    'Health & Fitness',
+    'E-commerce & Retail',
+    'Professional Services',
+    'B2B Software',
+    'Food & Beverage',
+    'Real Estate',
+    'Other',
+  ];
+
   return (
     <div className="client-directory-header">
       {/* Top Banner */}
@@ -21,22 +47,36 @@ export function ClientDirectoryHeader({
         <div className="directory-title-box">
           <div className="directory-badge">
             <Building2 size={14} />
-            <span>Multi-Tenant Client Hub</span>
+            <span>PostgreSQL Multi-Tenant Directory</span>
           </div>
-          <h1 className="directory-main-title">Client Accounts & Portfolios</h1>
+          <h1 className="directory-main-title">Client Accounts & Workspaces</h1>
           <p className="directory-subtext">
-            Manage agency client accounts, contact profiles, assigned team members, retainers, and integrated marketing channels.
+            Manage agency client accounts, contact profiles, contract retainers, and SLA tiers backed by live PostgreSQL.
           </p>
         </div>
 
-        <button
-          type="button"
-          className="btn-add-client-primary"
-          onClick={onOpenAddModal}
-        >
-          <Plus size={16} />
-          <span>Add New Client</span>
-        </button>
+        <div className="directory-header-actions">
+          <button
+            type="button"
+            className="btn-saas-secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh clients from database"
+            aria-label="Refresh clients from database"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-add-client-primary"
+            onClick={onOpenAddModal}
+          >
+            <Plus size={16} />
+            <span>Add New Client</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Control Toolbar */}
@@ -46,11 +86,45 @@ export function ClientDirectoryHeader({
           <Search size={16} className="search-icon-muted" />
           <input
             type="text"
-            placeholder="Search clients by name, industry, or contact..."
+            placeholder="Search by client name, industry, contact, email..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="directory-search-field"
           />
+        </div>
+
+        {/* Industry Filter Dropdown */}
+        <div className="directory-filter-select-wrapper">
+          <select
+            value={industryFilter}
+            onChange={(e) => onIndustryFilterChange(e.target.value)}
+            className="directory-filter-select"
+            aria-label="Filter by Industry"
+          >
+            {industries.map((ind) => (
+              <option key={ind} value={ind}>
+                {ind}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Sort Dropdown */}
+        <div className="directory-sort-select-wrapper">
+          <ArrowUpDown size={14} className="sort-icon-muted" />
+          <select
+            value={sortBy}
+            onChange={(e) => onSortByChange(e.target.value)}
+            className="directory-sort-select"
+            aria-label="Sort Clients"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+            <option value="retainer_desc">Highest Retainer</option>
+            <option value="health_desc">Highest Health Score</option>
+          </select>
         </div>
 
         {/* Status Filter Pills */}
@@ -60,28 +134,28 @@ export function ClientDirectoryHeader({
             className={`status-filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => onStatusFilterChange('all')}
           >
-            All Clients ({totalCount})
+            All ({totalCount})
           </button>
           <button
             type="button"
-            className={`status-filter-btn ${statusFilter === 'Active' ? 'active' : ''}`}
-            onClick={() => onStatusFilterChange('Active')}
+            className={`status-filter-btn ${statusFilter === 'active' ? 'active' : ''}`}
+            onClick={() => onStatusFilterChange('active')}
           >
             Active ({activeCount})
           </button>
           <button
             type="button"
-            className={`status-filter-btn ${statusFilter === 'Onboarding' ? 'active' : ''}`}
-            onClick={() => onStatusFilterChange('Onboarding')}
+            className={`status-filter-btn ${statusFilter === 'paused' ? 'active' : ''}`}
+            onClick={() => onStatusFilterChange('paused')}
           >
-            Onboarding ({onboardingCount})
+            Paused ({pausedCount})
           </button>
           <button
             type="button"
-            className={`status-filter-btn ${statusFilter === 'Paused' ? 'active' : ''}`}
-            onClick={() => onStatusFilterChange('Paused')}
+            className={`status-filter-btn ${statusFilter === 'inactive' ? 'active' : ''}`}
+            onClick={() => onStatusFilterChange('inactive')}
           >
-            Paused ({pausedCount})
+            Inactive ({inactiveCount})
           </button>
         </div>
 

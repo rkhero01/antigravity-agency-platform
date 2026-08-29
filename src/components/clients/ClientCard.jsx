@@ -1,101 +1,142 @@
 import React from 'react';
 import { Badge } from '../common/Badge.jsx';
 import {
-  ExternalLink,
   Mail,
-  Phone,
   ArrowRight,
-  TrendingUp,
-  Target,
-  DollarSign,
   User,
-  Share2,
+  Building2,
+  Edit2,
+  Archive,
+  Shield,
+  Activity,
+  Calendar,
 } from 'lucide-react';
 
-export function ClientCard({ client, onSelectClient }) {
+export function ClientCard({
+  client,
+  onSelectClient,
+  onEditClient,
+  onArchiveClient,
+}) {
+  const status = (client.status || 'Active').toLowerCase();
   const statusVariant =
-    client.status === 'Active'
+    status === 'active'
       ? 'success'
-      : client.status === 'Onboarding'
-      ? 'info'
-      : 'warning';
+      : status === 'paused'
+      ? 'warning'
+      : 'info';
+
+  const clientTitle = client.clientName || client.name || 'Untitled Client';
+  const primaryContact = client.primaryContact || client.contactPerson || 'Not provided';
+  const contactEmail = client.contactEmail || client.email || 'Not provided';
+  const retainer = Number(client.monthlyRetainer ?? client.monthlyBudget ?? 0);
+  const tier = client.tier || 'STANDARD';
+  const healthScore = client.healthScore !== undefined ? client.healthScore : 90;
+
+  const initials = clientTitle
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'CL';
 
   return (
     <div className="client-portfolio-card">
       {/* Top Header */}
       <div className="client-card-header">
         <div className="client-brand-meta">
-          <div className="client-avatar-monogram">
-            {client.name
-              .split(' ')
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join('')}
-          </div>
-          <div>
-            <h3 className="client-brand-title">{client.name}</h3>
-            <span className="client-industry-tag">{client.industry}</span>
+          <div className="client-avatar-monogram">{initials}</div>
+          <div className="client-title-block">
+            <h3 className="client-brand-title">{clientTitle}</h3>
+            <span className="client-industry-tag">{client.industry || 'General'}</span>
           </div>
         </div>
-        <Badge variant={statusVariant}>{client.status}</Badge>
+        <div className="client-card-badges">
+          <Badge variant={statusVariant}>{client.status || 'Active'}</Badge>
+        </div>
       </div>
 
       {/* Contact Summary */}
       <div className="client-contact-snippet">
         <div className="contact-item">
           <User size={13} className="contact-icon" />
-          <span>{client.contactPerson}</span>
+          <span className="truncate-text">{primaryContact}</span>
         </div>
         <div className="contact-item">
           <Mail size={13} className="contact-icon" />
-          <span className="truncate-text">{client.email}</span>
+          <span className="truncate-text">{contactEmail}</span>
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* Real PostgreSQL Metrics Grid */}
       <div className="client-stats-compact-grid">
         <div className="stat-compact-box">
-          <span className="stat-compact-label">Retainer Budget</span>
+          <span className="stat-compact-label">Monthly Retainer</span>
           <span className="stat-compact-val text-white">
-            ${client.monthlyBudget?.toLocaleString()}/mo
+            ${retainer.toLocaleString()}/mo
           </span>
         </div>
         <div className="stat-compact-box">
-          <span className="stat-compact-label">Avg ROAS</span>
-          <span className="stat-compact-val text-gold">{client.roas}</span>
+          <span className="stat-compact-label">Contract Tier</span>
+          <span className="stat-compact-val text-cyan">{tier}</span>
         </div>
         <div className="stat-compact-box">
-          <span className="stat-compact-label">Total Leads</span>
-          <span className="stat-compact-val text-emerald">
-            {client.totalLeads?.toLocaleString()}
+          <span className="stat-compact-label">Health Score</span>
+          <span
+            className={`stat-compact-val ${
+              healthScore >= 80 ? 'text-emerald' : 'text-gold'
+            }`}
+          >
+            {healthScore}/100
           </span>
         </div>
         <div className="stat-compact-box">
-          <span className="stat-compact-label">Audience Reach</span>
-          <span className="stat-compact-val text-cyan">{client.audienceSize}</span>
+          <span className="stat-compact-label">Workspace ID</span>
+          <span className="stat-compact-val text-muted text-xs truncate-text" title={client.id}>
+            {client.id?.substring(0, 10)}...
+          </span>
         </div>
       </div>
 
-      {/* Connected Channels & Lead */}
-      <div className="client-channels-lead-row">
-        <div className="connected-channels-pill-list">
-          {client.connectedPlatforms?.map((plat) => (
-            <span key={plat} className="channel-mini-pill">
-              {plat}
-            </span>
-          ))}
-        </div>
-        <span className="assigned-lead-tag">Lead: {client.assignedMember}</span>
-      </div>
-
-      {/* Footer Action */}
+      {/* Footer Actions */}
       <div className="client-card-footer-action">
+        <div className="client-card-subactions">
+          {onEditClient && (
+            <button
+              type="button"
+              className="btn-card-icon-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditClient(client);
+              }}
+              title="Edit Client"
+              aria-label="Edit Client"
+            >
+              <Edit2 size={14} />
+            </button>
+          )}
+          {onArchiveClient && (
+            <button
+              type="button"
+              className="btn-card-icon-action archive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchiveClient(client);
+              }}
+              title="Archive Client"
+              aria-label="Archive Client"
+            >
+              <Archive size={14} />
+            </button>
+          )}
+        </div>
+
         <button
           type="button"
           className="btn-open-client-profile"
           onClick={() => onSelectClient(client)}
         >
-          <span>Open Client Workspace</span>
+          <span>Open Workspace</span>
           <ArrowRight size={14} />
         </button>
       </div>

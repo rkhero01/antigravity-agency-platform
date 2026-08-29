@@ -1,5 +1,7 @@
-export * from './ClientDirectoryHeader.jsx';
-export * from './ClientCard.jsx';
-export * from './ClientTable.jsx';
-export * from './ClientProfileView.jsx';
-export * from './AddClientModal.jsx';
+export { ClientDirectoryHeader } from './ClientDirectoryHeader.jsx';
+export { ClientCard } from './ClientCard.jsx';
+export { ClientTable } from './ClientTable.jsx';
+export { ClientProfileView } from './ClientProfileView.jsx';
+export { AddClientModal } from './AddClientModal.jsx';
+export { EditClientModal } from './EditClientModal.jsx';
+export { ArchiveClientModal } from './ArchiveClientModal.jsx';

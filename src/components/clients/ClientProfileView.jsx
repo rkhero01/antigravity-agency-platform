@@ -1,38 +1,75 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft,
-  Globe,
-  MapPin,
   Mail,
-  Phone,
   Calendar,
-  Share2,
-  TrendingUp,
-  Target,
+  Building2,
   DollarSign,
-  Users,
+  User,
+  Shield,
+  Activity,
+  Edit2,
+  Archive,
   Sparkles,
-  Plus,
-  Edit,
-  CheckCircle2,
+  Layers,
   Clock,
-  FileText,
+  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 
-export function ClientProfileView({ client, onBack, onNavigateToModule }) {
+export function ClientProfileView({
+  client,
+  onBack,
+  onNavigateToModule,
+  onEditClient,
+  onArchiveClient,
+}) {
   const [activeTab, setActiveTab] = useState('overview');
 
+  if (!client) return null;
+
+  const status = (client.status || 'Active').toLowerCase();
   const statusVariant =
-    client.status === 'Active'
+    status === 'active'
       ? 'success'
-    : client.status === 'Onboarding'
-    ? 'info'
-    : 'warning';
+      : status === 'paused'
+      ? 'warning'
+      : 'info';
+
+  const clientTitle = client.clientName || client.name || 'Untitled Client';
+  const primaryContact = client.primaryContact || client.contactPerson || 'Not provided';
+  const contactEmail = client.contactEmail || client.email || 'Not provided';
+  const retainer = Number(client.monthlyRetainer ?? client.monthlyBudget ?? 0);
+  const tier = client.tier || 'STANDARD';
+  const healthScore = client.healthScore !== undefined ? client.healthScore : 90;
+
+  const createdDate = client.createdAt
+    ? new Date(client.createdAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : 'Not recorded';
+
+  const updatedDate = client.updatedAt
+    ? new Date(client.updatedAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : 'Not recorded';
+
+  const initials = clientTitle
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'CL';
 
   return (
     <div className="client-profile-view-container">
-      {/* Back Navigation Bar */}
+      {/* Top Bar */}
       <div className="profile-top-nav-bar">
         <button type="button" className="btn-back-to-directory" onClick={onBack}>
           <ArrowLeft size={16} />
@@ -40,61 +77,68 @@ export function ClientProfileView({ client, onBack, onNavigateToModule }) {
         </button>
 
         <div className="profile-action-buttons">
-          <button
-            type="button"
-            className="btn-saas-secondary"
-            onClick={() => onNavigateToModule?.('ai-assistant')}
-          >
-            <Sparkles size={15} />
-            <span>AI Copy for {client.name.split(' ')[0]}</span>
-          </button>
+          {onEditClient && (
+            <button
+              type="button"
+              className="btn-saas-secondary"
+              onClick={() => onEditClient(client)}
+            >
+              <Edit2 size={14} />
+              <span>Edit Client</span>
+            </button>
+          )}
+
+          {onArchiveClient && (
+            <button
+              type="button"
+              className="btn-archive-secondary"
+              onClick={() => onArchiveClient(client)}
+            >
+              <Archive size={14} />
+              <span>Archive Client</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="btn-saas-primary"
-            onClick={() => onNavigateToModule?.('content')}
+            onClick={() => onNavigateToModule?.('ai-assistant')}
           >
-            <Plus size={15} />
-            <span>New Post for Client</span>
+            <Sparkles size={14} />
+            <span>Generate Strategy Copy</span>
           </button>
         </div>
       </div>
 
-      {/* Main Client Banner */}
+      {/* Main Hero Card */}
       <div className="client-profile-hero-card">
         <div className="profile-hero-top">
-          <div className="profile-hero-avatar">
-            {client.name
-              .split(' ')
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join('')}
-          </div>
+          <div className="profile-hero-avatar">{initials}</div>
 
           <div className="profile-hero-info">
             <div className="profile-title-row">
-              <h2 className="profile-brand-name">{client.name}</h2>
-              <Badge variant={statusVariant}>{client.status}</Badge>
+              <h2 className="profile-brand-name">{clientTitle}</h2>
+              <Badge variant={statusVariant}>{client.status || 'Active'}</Badge>
+              <span className="tier-tag-pill hero">{tier}</span>
             </div>
-            <p className="profile-industry-subtitle">{client.industry}</p>
+            <p className="profile-industry-subtitle">{client.industry || 'General Industry'}</p>
 
             <div className="profile-contact-links-grid">
               <div className="profile-link-item">
-                <Globe size={14} className="text-cyan" />
-                <a href={client.website} target="_blank" rel="noreferrer">
-                  {client.website?.replace('https://', '')}
-                </a>
+                <User size={14} className="text-cyan" />
+                <span>{primaryContact}</span>
               </div>
               <div className="profile-link-item">
-                <MapPin size={14} className="text-violet" />
-                <span>{client.location}</span>
+                <Mail size={14} className="text-violet" />
+                <span>{contactEmail}</span>
               </div>
               <div className="profile-link-item">
-                <Mail size={14} className="text-muted" />
-                <span>{client.email}</span>
+                <Calendar size={14} className="text-muted" />
+                <span>Client Since: {createdDate}</span>
               </div>
               <div className="profile-link-item">
-                <Phone size={14} className="text-muted" />
-                <span>{client.phone}</span>
+                <Clock size={14} className="text-muted" />
+                <span>Last Updated: {updatedDate}</span>
               </div>
             </div>
           </div>
@@ -107,29 +151,22 @@ export function ClientProfileView({ client, onBack, onNavigateToModule }) {
             className={`profile-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview & Metrics
+            Account Details & Billing
           </button>
           <button
             type="button"
-            className={`profile-tab-btn ${activeTab === 'channels' ? 'active' : ''}`}
-            onClick={() => setActiveTab('channels')}
+            className={`profile-tab-btn ${activeTab === 'governance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('governance')}
           >
-            Connected Channels ({client.connectedPlatforms?.length})
-          </button>
-          <button
-            type="button"
-            className={`profile-tab-btn ${activeTab === 'strategy' ? 'active' : ''}`}
-            onClick={() => setActiveTab('strategy')}
-          >
-            Strategy & Notes
+            Tenant Governance & Database Metadata
           </button>
         </div>
       </div>
 
-      {/* Tab 1: Overview & Metrics */}
+      {/* Tab 1: Account Details & Billing */}
       {activeTab === 'overview' && (
         <div className="profile-tab-content-stack">
-          {/* 4 KPI Cards */}
+          {/* 4 Real Metric KPI Cards */}
           <div className="client-kpis-grid">
             <div className="profile-kpi-card">
               <div className="kpi-icon-pill bg-violet">
@@ -137,143 +174,114 @@ export function ClientProfileView({ client, onBack, onNavigateToModule }) {
               </div>
               <div className="profile-kpi-data">
                 <span className="profile-kpi-label">Monthly Retainer</span>
-                <span className="profile-kpi-value">${client.monthlyBudget?.toLocaleString()}</span>
-                <span className="profile-kpi-sub">Active billing cycle</span>
-              </div>
-            </div>
-
-            <div className="profile-kpi-card">
-              <div className="kpi-icon-pill bg-gold">
-                <TrendingUp size={18} />
-              </div>
-              <div className="profile-kpi-data">
-                <span className="profile-kpi-label">Average ROAS</span>
-                <span className="profile-kpi-value text-gold">{client.roas}</span>
-                <span className="profile-kpi-sub">+0.6x higher than target</span>
-              </div>
-            </div>
-
-            <div className="profile-kpi-card">
-              <div className="kpi-icon-pill bg-emerald">
-                <Target size={18} />
-              </div>
-              <div className="profile-kpi-data">
-                <span className="profile-kpi-label">Total Leads</span>
-                <span className="profile-kpi-value text-emerald">{client.totalLeads?.toLocaleString()}</span>
-                <span className="profile-kpi-sub">Paid & organic funnels</span>
+                <span className="profile-kpi-value">${retainer.toLocaleString()}/mo</span>
+                <span className="profile-kpi-sub">Active recurring retainer</span>
               </div>
             </div>
 
             <div className="profile-kpi-card">
               <div className="kpi-icon-pill bg-cyan">
-                <Users size={18} />
+                <Shield size={18} />
               </div>
               <div className="profile-kpi-data">
-                <span className="profile-kpi-label">Audience Reach</span>
-                <span className="profile-kpi-value text-cyan">{client.audienceSize}</span>
-                <span className="profile-kpi-sub">Cross-platform followers</span>
+                <span className="profile-kpi-label">Contract Tier</span>
+                <span className="profile-kpi-value text-cyan">{tier}</span>
+                <span className="profile-kpi-sub">SLA tier level</span>
+              </div>
+            </div>
+
+            <div className="profile-kpi-card">
+              <div className="kpi-icon-pill bg-emerald">
+                <Activity size={18} />
+              </div>
+              <div className="profile-kpi-data">
+                <span className="profile-kpi-label">Account Health Score</span>
+                <span
+                  className={`profile-kpi-value ${
+                    healthScore >= 80 ? 'text-emerald' : 'text-gold'
+                  }`}
+                >
+                  {healthScore}/100
+                </span>
+                <span className="profile-kpi-sub">Autonomous health check</span>
+              </div>
+            </div>
+
+            <div className="profile-kpi-card">
+              <div className="kpi-icon-pill bg-gold">
+                <Building2 size={18} />
+              </div>
+              <div className="profile-kpi-data">
+                <span className="profile-kpi-label">Industry Classification</span>
+                <span className="profile-kpi-value text-white">{client.industry || 'General'}</span>
+                <span className="profile-kpi-sub">Market segment</span>
               </div>
             </div>
           </div>
 
-          {/* Two Columns: Recent Scheduled Content & Client Strategy */}
-          <div className="profile-content-columns">
-            <div className="dashboard-panel">
-              <div className="panel-header">
-                <div className="panel-header-left">
-                  <h3>Recent Scheduled Content</h3>
-                  <p>Upcoming campaigns for {client.name}</p>
-                </div>
-              </div>
-              <div className="profile-posts-list">
-                {client.recentPosts?.map((post, idx) => (
-                  <div key={idx} className="profile-post-row">
-                    <div className="post-row-left">
-                      <span className="post-platform-tag">{post.platform}</span>
-                      <strong className="post-title-text">{post.title}</strong>
-                    </div>
-                    <Badge
-                      variant={
-                        post.status === 'Scheduled'
-                          ? 'success'
-                          : post.status === 'Approved'
-                          ? 'info'
-                          : 'warning'
-                      }
-                      size="sm"
-                    >
-                      {post.status}
-                    </Badge>
-                  </div>
-                ))}
+          {/* Account Details Panel */}
+          <div className="dashboard-panel">
+            <div className="panel-header">
+              <div className="panel-header-left">
+                <h3>Primary Account Information</h3>
+                <p>PostgreSQL verified client record</p>
               </div>
             </div>
-
-            <div className="dashboard-panel">
-              <div className="panel-header">
-                <div className="panel-header-left">
-                  <h3>Assigned Team & Strategy Note</h3>
-                  <p>Account governance & creative direction</p>
-                </div>
+            <div className="client-details-grid-spec">
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Official Client Name</span>
+                <strong className="detail-spec-val">{clientTitle}</strong>
               </div>
-              <div className="profile-strategy-box">
-                <div className="assigned-lead-callout">
-                  <span className="lead-label">Account Lead:</span>
-                  <strong className="lead-name">👤 {client.assignedMember}</strong>
-                </div>
-                <p className="strategy-text-para">
-                  {client.strategyNote ||
-                    'Standard agency social media marketing and automated lead capture strategy.'}
-                </p>
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Industry Sector</span>
+                <strong className="detail-spec-val">{client.industry || 'General'}</strong>
+              </div>
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Primary Account Contact</span>
+                <strong className="detail-spec-val">{primaryContact}</strong>
+              </div>
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Contact Email Address</span>
+                <strong className="detail-spec-val">{contactEmail}</strong>
+              </div>
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Contract Retainer</span>
+                <strong className="detail-spec-val">${retainer.toLocaleString()} / month</strong>
+              </div>
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Account Status</span>
+                <strong className="detail-spec-val">{client.status || 'Active'}</strong>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 2: Connected Channels */}
-      {activeTab === 'channels' && (
+      {/* Tab 2: Tenant Governance & Database Metadata */}
+      {activeTab === 'governance' && (
         <div className="dashboard-panel">
           <div className="panel-header">
             <div className="panel-header-left">
-              <h3>Integrated Social Channels</h3>
-              <p>Active API connections and publishing sync</p>
+              <h3>PostgreSQL Database & Multi-Tenant Audit</h3>
+              <p>Cryptographic identity and relational identifiers</p>
             </div>
           </div>
-          <div className="channels-detailed-grid">
-            {client.connectedPlatforms?.map((plat) => (
-              <div key={plat} className="channel-detail-box">
-                <div className="channel-box-top">
-                  <Share2 size={20} className="text-cyan" />
-                  <Badge variant="success" size="sm">
-                    Synced
-                  </Badge>
-                </div>
-                <h4 className="channel-platform-title">{plat.toUpperCase()}</h4>
-                <p className="channel-sync-sub">Auto-publishing enabled • Token valid</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Strategy & Notes */}
-      {activeTab === 'strategy' && (
-        <div className="dashboard-panel">
-          <div className="panel-header">
-            <div className="panel-header-left">
-              <h3>Agency Creative Blueprint & Tone of Voice</h3>
-              <p>Guidelines for copywriters and AI Studio generation</p>
+          <div className="client-details-grid-spec">
+            <div className="detail-spec-item full-width">
+              <span className="detail-spec-label">PostgreSQL Client Record ID (UUID)</span>
+              <code className="detail-spec-code">{client.id}</code>
             </div>
-          </div>
-          <div className="strategy-detailed-card">
-            <div className="strategy-item-block">
-              <strong>Core Marketing Objective:</strong>
-              <p>Scale high-intent conversions while building sustainable organic brand authority.</p>
+            <div className="detail-spec-item full-width">
+              <span className="detail-spec-label">Assigned Agency Tenant ID</span>
+              <code className="detail-spec-code">{client.agencyId}</code>
             </div>
-            <div className="strategy-item-block">
-              <strong>Brand Voice Guidelines:</strong>
-              <p>{client.strategyNote}</p>
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Created At (UTC)</span>
+              <strong className="detail-spec-val">{client.createdAt || 'Not recorded'}</strong>
+            </div>
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Last Updated At (UTC)</span>
+              <strong className="detail-spec-val">{client.updatedAt || 'Not recorded'}</strong>
             </div>
           </div>
         </div>
