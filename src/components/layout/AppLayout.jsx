@@ -10,6 +10,7 @@ export function AppLayout({
   onClientChange,
   dateRange,
   onDateRangeChange,
+  currentUser = null,
   children,
 }) {
   const currentItem = NAVIGATION_ITEMS.find((item) => item.id === activeModule);
@@ -29,6 +30,8 @@ export function AppLayout({
           activeClient={activeClient}
           onClientChange={onClientChange}
           onOpenQuickAction={onNavigate}
+          onNavigate={onNavigate}
+          currentUser={currentUser}
         />
         <main className="saas-content-canvas" id="main-content">
           {children}

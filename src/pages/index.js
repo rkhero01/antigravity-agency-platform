@@ -24,3 +24,4 @@ export * from './Reports/index.jsx';
 export * from './ClientPortal/index.jsx';
 export * from './Settings/index.jsx';
 export * from './AIIntelligence/index.jsx';
+export * from './Auth/index.js';

@@ -17,25 +17,23 @@ class AuthSessionService {
   loadInitialUser() {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
+        const token = apiClient.getAuthToken();
         const stored = window.localStorage.getItem(USER_PROFILE_KEY);
-        if (stored) {
-          return JSON.parse(stored);
+        if (token && stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.email) {
+            return {
+              ...parsed,
+              isAuthenticated: true,
+            };
+          }
         }
       }
     } catch (e) {
       // Fallback
     }
 
-    // Default Demo Sandbox Session (Owner of agency-demo-001)
-    return {
-      id: 'usr-owner-001',
-      agencyId: 'agency-demo-001',
-      email: 'owner@antigravity.agency',
-      name: 'Agency Principal / Owner',
-      role: 'OWNER',
-      permissions: ['*'],
-      isAuthenticated: true,
-    };
+    return null;
   }
 
   saveUser(user) {
@@ -101,24 +99,28 @@ class AuthSessionService {
   async restoreSession() {
     const token = apiClient.getAuthToken();
     if (!token) {
-      if (this.currentUser) return this.currentUser;
+      this.saveUser(null);
       return null;
     }
 
     try {
       const response = await apiClient.auth.me();
-      const user = response.data.user;
-      const userProfile = {
-        ...user,
-        isAuthenticated: true,
-      };
-      this.saveUser(userProfile);
-      return userProfile;
+      const user = response.data?.user;
+      if (user) {
+        const userProfile = {
+          ...user,
+          isAuthenticated: true,
+        };
+        this.saveUser(userProfile);
+        return userProfile;
+      }
+      return null;
     } catch (err) {
       // If unauthorized, clear invalid token
       if (err.status === 401 || err.code === 'AUTHENTICATION_ERROR') {
         apiClient.clearAuthToken();
         this.saveUser(null);
+        return null;
       }
       return this.currentUser;
     }

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppLayout } from './components/layout/index.js';
 import { useNavigation } from './hooks/useNavigation.js';
 import { MODULES } from './utils/constants.js';
+import { authSessionService } from './services/authSessionService.js';
+import { LoginPage } from './pages/Auth/LoginPage.jsx';
 
 import { DashboardPage } from './pages/Dashboard/index.jsx';
 import { ClientsPage } from './pages/Clients/index.jsx';
@@ -33,6 +35,23 @@ import { SettingsPage } from './pages/Settings/index.jsx';
 import './App.css';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => authSessionService.getCurrentUser());
+  const [isSessionRestoring, setIsSessionRestoring] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = authSessionService.subscribe((user) => {
+      setCurrentUser(user);
+    });
+
+    authSessionService
+      .restoreSession()
+      .then((user) => setCurrentUser(user))
+      .catch(() => setCurrentUser(null))
+      .finally(() => setIsSessionRestoring(false));
+
+    return unsubscribe;
+  }, []);
+
   const { activeModule, navigateTo, activeClient, setActiveClient } = useNavigation(
     MODULES.DASHBOARD
   );
@@ -123,6 +142,25 @@ export default function App() {
     }
   };
 
+  if (isSessionRestoring) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-spinner" />
+        <p className="auth-loading-text">Connecting to Antigravity Cloud...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser || !currentUser.isAuthenticated) {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+        }}
+      />
+    );
+  }
+
   return (
     <AppLayout
       activeModule={activeModule}
@@ -131,6 +169,7 @@ export default function App() {
       onClientChange={setActiveClient}
       dateRange={dateRange}
       onDateRangeChange={setDateRange}
+      currentUser={currentUser}
     >
       {renderActiveModule()}
     </AppLayout>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Bell,
@@ -6,9 +6,14 @@ import {
   Sparkles,
   ChevronDown,
   Building,
-  Check,
+  Settings,
+  Users,
+  Key,
+  LogOut,
 } from 'lucide-react';
 import { mockClients } from '../../data/mockClients.js';
+import { authSessionService } from '../../services/authSessionService.js';
+import { MODULES } from '../../utils/constants.js';
 
 export function Topbar({
   activeTitle = 'Dashboard',
@@ -17,16 +22,66 @@ export function Topbar({
   activeClient = 'all',
   onClientChange,
   onOpenQuickAction,
+  onNavigate,
+  currentUser = null,
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [user, setUser] = useState(() => currentUser || authSessionService.getCurrentUser());
+  const menuRef = useRef(null);
+  const notifRef = useRef(null);
 
-  const dateRangeLabels = {
-    '7d': 'Last 7 Days',
-    '30d': 'Last 30 Days',
-    '90d': 'Last Quarter (90D)',
-    ytd: 'Year to Date (YTD)',
+  useEffect(() => {
+    if (currentUser) {
+      setUser(currentUser);
+    }
+    const unsubscribe = authSessionService.subscribe((updatedUser) => {
+      setUser(updatedUser);
+    });
+    return unsubscribe;
+  }, [currentUser]);
+
+  // Click outside to dismiss dropdowns
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleNavigation = (module) => {
+    setShowUserMenu(false);
+    if (onNavigate) {
+      onNavigate(module);
+    } else if (onOpenQuickAction) {
+      onOpenQuickAction(module);
+    }
   };
+
+  const handleSignOut = async (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    setShowUserMenu(false);
+    await authSessionService.logout();
+  };
+
+  const displayName = user?.name || 'Agency Operator';
+  const displayEmail = user?.email || 'authenticated@antigravity.agency';
+  const displayRole = user?.role || 'OPERATOR';
+  const displayAgency = user?.agencyId || 'agency-demo-001';
+
+  const initials = displayName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase() || 'AG';
 
   return (
     <header className="saas-topbar">
@@ -88,7 +143,7 @@ export function Topbar({
         <button
           type="button"
           className="topbar-ai-btn"
-          onClick={() => onOpenQuickAction?.('ai-assistant')}
+          onClick={() => handleNavigation(MODULES.AI_ASSISTANT)}
           title="Open AI Studio"
         >
           <Sparkles size={15} className="ai-btn-icon" />
@@ -96,7 +151,7 @@ export function Topbar({
         </button>
 
         {/* Notifications Dropdown */}
-        <div className="notification-wrapper">
+        <div className="notification-wrapper" ref={notifRef}>
           <button
             type="button"
             className="topbar-icon-button"
@@ -146,40 +201,70 @@ export function Topbar({
         </div>
 
         {/* User / Profile Menu */}
-        <div className="user-menu-wrapper">
+        <div className="user-menu-wrapper" ref={menuRef}>
           <button
             type="button"
             className="user-profile-trigger"
             onClick={() => setShowUserMenu(!showUserMenu)}
             aria-label="User Profile Menu"
+            aria-expanded={showUserMenu}
           >
-            <div className="user-avatar-badge">AM</div>
+            <div className="user-avatar-badge">{initials}</div>
             <div className="user-text-info">
-              <span className="user-display-name">Alex Morgan</span>
-              <span className="user-role-label">Agency Director</span>
+              <span className="user-display-name">{displayName}</span>
+              <span className="user-role-label">{displayRole}</span>
             </div>
             <ChevronDown size={14} className="chevron-icon" />
           </button>
 
           {showUserMenu && (
-            <div className="user-dropdown-card">
+            <div className="user-dropdown-card" role="menu" aria-label="User profile options">
               <div className="user-card-head">
-                <strong>Alex Morgan</strong>
-                <span>alex@pulseagency.ai</span>
+                <div className="user-card-avatar-lg">{initials}</div>
+                <div className="user-card-info-group">
+                  <strong className="user-card-title">{displayName}</strong>
+                  <span className="user-card-email-sub">{displayEmail}</span>
+                  <span className="user-card-tenant-badge">{displayAgency}</span>
+                </div>
               </div>
+
               <div className="user-card-links">
-                <button type="button" className="user-card-item">
-                  Workspace Settings
+                <button
+                  type="button"
+                  className="user-card-item"
+                  onClick={() => handleNavigation(MODULES.SETTINGS)}
+                >
+                  <Settings size={15} className="user-card-item-icon" />
+                  <span>Workspace Settings</span>
                 </button>
-                <button type="button" className="user-card-item">
-                  Team Members & Roles
+
+                <button
+                  type="button"
+                  className="user-card-item"
+                  onClick={() => handleNavigation(MODULES.TEAM)}
+                >
+                  <Users size={15} className="user-card-item-icon" />
+                  <span>Team Members & Roles</span>
                 </button>
-                <button type="button" className="user-card-item">
-                  API & Integrations
+
+                <button
+                  type="button"
+                  className="user-card-item"
+                  onClick={() => handleNavigation(MODULES.SETTINGS)}
+                >
+                  <Key size={15} className="user-card-item-icon" />
+                  <span>API & Integrations</span>
                 </button>
+
                 <div className="user-divider" />
-                <button type="button" className="user-card-item signout">
-                  Sign Out
+
+                <button
+                  type="button"
+                  className="user-card-item signout"
+                  onClick={handleSignOut}
+                >
+                  <LogOut size={15} className="user-card-item-icon" />
+                  <span>Sign Out</span>
                 </button>
               </div>
             </div>
