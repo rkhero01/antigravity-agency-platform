@@ -27,7 +27,7 @@ function getEnvVar(key, fallback = '') {
 }
 
 export const ENV_CONFIG = {
-  API_BASE_URL: getEnvVar('VITE_API_BASE_URL', '/api/v1'),
+  API_BASE_URL: getEnvVar('VITE_API_BASE_URL', 'https://antigravity-agency-platform.onrender.com/api/v1'),
   APP_ENV: getEnvVar('VITE_APP_ENV', 'development'),
   EXECUTION_MODE: getEnvVar('VITE_AI_EXECUTION_MODE', 'DEMO').toUpperCase(), // 'DEMO' | 'REAL'
   IS_DEMO: getEnvVar('VITE_AI_EXECUTION_MODE', 'DEMO').toUpperCase() !== 'REAL',

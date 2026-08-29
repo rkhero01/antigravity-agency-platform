@@ -13,8 +13,8 @@ const MAX_SAFE_RETRIES = 2;
 const AUTH_STORAGE_KEY = 'antigravity_auth_token';
 
 class ApiClient {
-  constructor(baseUrl = ENV_CONFIG.API_BASE_URL || 'http://localhost:5000') {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl = ENV_CONFIG.API_BASE_URL) {
+    this.baseUrl = (baseUrl || 'https://antigravity-agency-platform.onrender.com/api/v1').replace(/\/$/, '');
     this.token = this.loadStoredToken();
   }
 
