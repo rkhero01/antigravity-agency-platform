@@ -1,91 +1,93 @@
 import React from 'react';
-import { Users, Shield, Award, BarChart3, Video, Building } from 'lucide-react';
+import {
+  Users,
+  Shield,
+  Briefcase,
+  Activity,
+  CheckCircle2,
+  Lock,
+} from 'lucide-react';
 
-export function TeamKpiCards({ metrics = {} }) {
-  const cards = [
-    {
-      id: 'total',
-      title: 'Total Active Staff',
-      value: `${metrics.total || 6} Members`,
-      subtitle: '100% Verified accounts',
-      change: 'Full agency strength',
-      icon: Users,
-      color: '#6366f1',
-    },
-    {
-      id: 'admins',
-      title: 'Admins & Partners',
-      value: `${metrics.adminCount || 1} Superuser`,
-      subtitle: 'System & billing governance',
-      change: 'Full OS access',
-      icon: Shield,
-      color: '#ec4899',
-    },
-    {
-      id: 'managers',
-      title: 'Creative Managers',
-      value: `${metrics.managerCount || 1} Director`,
-      subtitle: 'Campaign review & approvals',
-      change: 'Approval authority',
-      icon: Award,
-      color: '#f59e0b',
-    },
-    {
-      id: 'analysts',
-      title: 'Performance Analysts',
-      value: `${metrics.analystCount || 2} Analysts`,
-      subtitle: 'Paid media & attribution',
-      change: 'Budget scaling',
-      icon: BarChart3,
-      color: '#06b6d4',
-    },
-    {
-      id: 'creators',
-      title: 'Content Creators',
-      value: `${metrics.creatorCount || 2} Creators`,
-      subtitle: 'Reels, copy & carousels',
-      change: 'Drafting & AI Studio',
-      icon: Video,
-      color: '#10b981',
-    },
-    {
-      id: 'coverage',
-      title: 'Workspaces Covered',
-      value: '6/6 Accounts',
-      subtitle: 'Zero unassigned clients',
-      change: '100% SLA Coverage',
-      icon: Building,
-      color: '#8b5cf6',
-    },
-  ];
+export function TeamKpiCards({ metrics }) {
+  if (!metrics) return null;
 
   return (
-    <div className="team-kpis-grid">
-      {cards.map((card) => {
-        const IconComponent = card.icon;
-        return (
-          <div key={card.id} className="team-kpi-card">
-            <div className="kpi-top-row">
-              <span className="kpi-title-label">{card.title}</span>
-              <div
-                className="kpi-icon-pill"
-                style={{ background: `${card.color}20`, color: card.color }}
-              >
-                <IconComponent size={16} />
-              </div>
-            </div>
+    <div className="team-kpi-cards-grid">
+      {/* 1. Total Team Size */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-violet">
+          <Users size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Active Agency Seats</span>
+          <span className="team-kpi-val">{metrics.total}</span>
+          <span className="team-kpi-sub">Total provisioned seats</span>
+        </div>
+      </div>
 
-            <div className="kpi-value-block">
-              <span className="kpi-main-number">{card.value}</span>
-            </div>
+      {/* 2. Active Operators */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-emerald">
+          <CheckCircle2 size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Active Status</span>
+          <span className="team-kpi-val text-emerald">{metrics.activeCount}</span>
+          <span className="team-kpi-sub">Online & operational</span>
+        </div>
+      </div>
 
-            <div className="kpi-bottom-row">
-              <span className="kpi-change-tag positive">{card.change}</span>
-              <span className="kpi-subtext">{card.subtitle}</span>
-            </div>
-          </div>
-        );
-      })}
+      {/* 3. Agency Governance (Owners & Admins) */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-danger">
+          <Shield size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Owners & Admins</span>
+          <span className="team-kpi-val text-gold">
+            {(metrics.ownerCount || 0) + (metrics.adminCount || 0)}
+          </span>
+          <span className="team-kpi-sub">Full system governance</span>
+        </div>
+      </div>
+
+      {/* 4. Creative Managers */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-gold">
+          <Briefcase size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Campaign Managers</span>
+          <span className="team-kpi-val text-white">{metrics.managerCount || 0}</span>
+          <span className="team-kpi-sub">Client & deliverable leads</span>
+        </div>
+      </div>
+
+      {/* 5. Operators */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-cyan">
+          <Activity size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Marketing Operators</span>
+          <span className="team-kpi-val text-cyan">{metrics.operatorCount || 0}</span>
+          <span className="team-kpi-sub">Funnels & automation</span>
+        </div>
+      </div>
+
+      {/* 6. Analysts & Viewers */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-info">
+          <Lock size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Analysts & Viewers</span>
+          <span className="team-kpi-val text-muted">
+            {(metrics.analystCount || 0) + (metrics.viewerCount || 0)}
+          </span>
+          <span className="team-kpi-sub">Audit & read-only access</span>
+        </div>
+      </div>
     </div>
   );
 }

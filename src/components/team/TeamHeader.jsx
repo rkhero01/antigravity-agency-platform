@@ -1,13 +1,14 @@
 import React from 'react';
 import {
   Users,
-  Shield,
-  History,
-  Plus,
+  UserPlus,
   Search,
-  Filter,
-  UserCheck,
+  LayoutGrid,
+  ShieldCheck,
+  RefreshCw,
+  SlidersHorizontal,
 } from 'lucide-react';
+import { TEAM_ROLES } from '../../services/teamService.js';
 
 export function TeamHeader({
   viewMode,
@@ -19,115 +20,142 @@ export function TeamHeader({
   searchQuery,
   onSearchChange,
   onOpenInviteModal,
+  onRefresh,
+  isRefreshing,
 }) {
-  const roles = ['all', 'Admin', 'Manager', 'Analyst', 'Creator'];
-  const statuses = ['all', 'Active', 'Invited', 'Suspended'];
+  const rolesList = [
+    { value: 'all', label: 'All Roles' },
+    { value: TEAM_ROLES.OWNER, label: 'Owner (OWNER)' },
+    { value: TEAM_ROLES.ADMIN, label: 'Admin (ADMIN)' },
+    { value: TEAM_ROLES.MANAGER, label: 'Manager (MANAGER)' },
+    { value: TEAM_ROLES.OPERATOR, label: 'Operator (OPERATOR)' },
+    { value: TEAM_ROLES.ANALYST, label: 'Analyst (ANALYST)' },
+    { value: TEAM_ROLES.VIEWER, label: 'Viewer (VIEWER)' },
+  ];
 
   return (
     <div className="team-header-container">
       {/* Top Banner */}
       <div className="team-top-banner">
-        <div className="team-title-block">
-          <div className="team-badge-tag">
-            <Shield size={14} />
-            <span>Role-Based Access & Team Governance</span>
+        <div className="team-title-box">
+          <div className="team-badge">
+            <Users size={14} />
+            <span>Multi-Tenant Access Control & Governance</span>
           </div>
-          <h1 className="team-main-title">Team Management & Access Permissions</h1>
-          <p className="team-subtitle-text">
-            Configure agency staff roles, granular module permissions, multi-client workspace allocations, and security audit trails.
+          <h1 className="team-main-title">Team Members & Role Permissions</h1>
+          <p className="team-subtext">
+            Manage agency operator seats, RBAC security privileges, departments, and audit governance backed by PostgreSQL.
           </p>
         </div>
 
-        <div className="team-banner-actions">
-          {/* View Mode Tabs */}
-          <div className="view-mode-tabs-group" role="group" aria-label="Team View Mode">
-            <button
-              type="button"
-              className={`view-tab-btn ${viewMode === 'directory' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('directory')}
-            >
-              <Users size={15} />
-              <span>Team Directory</span>
-            </button>
-            <button
-              type="button"
-              className={`view-tab-btn ${viewMode === 'matrix' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('matrix')}
-            >
-              <Shield size={15} />
-              <span>Permission Matrix</span>
-            </button>
-            <button
-              type="button"
-              className={`view-tab-btn ${viewMode === 'logs' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('logs')}
-            >
-              <History size={15} />
-              <span>Activity Log</span>
-            </button>
-          </div>
+        <div className="team-header-actions">
+          <button
+            type="button"
+            className="btn-saas-secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh team members from database"
+            aria-label="Refresh team members from database"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
 
           <button
             type="button"
-            className="btn-invite-member-primary"
+            className="btn-add-client-primary"
             onClick={onOpenInviteModal}
           >
-            <Plus size={16} />
-            <span>Invite Team Member</span>
+            <UserPlus size={16} />
+            <span>Add Team Member</span>
           </button>
         </div>
       </div>
 
-      {/* Toolbar & Filters */}
-      <div className="team-toolbar-card">
-        <div className="toolbar-controls-row">
-          {/* Search Box */}
-          <div className="team-search-field-box">
-            <Search size={14} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search team members by name, email, or role..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="team-search-input"
-            />
-          </div>
+      {/* Controls and Filters */}
+      <div className="team-toolbar-row">
+        {/* Search */}
+        <div className="team-search-wrapper">
+          <Search size={16} className="search-icon-muted" />
+          <input
+            type="text"
+            placeholder="Search by name, email, role, or department..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="team-search-input"
+          />
+        </div>
 
-          {/* Role Filter */}
-          <div className="team-select-wrapper">
-            <Shield size={14} className="icon-muted" />
-            <select
-              value={selectedRole}
-              onChange={(e) => onRoleChange(e.target.value)}
-              className="team-select-field"
-              aria-label="Filter by Role"
-            >
-              <option value="all">🛡️ All Role Tiers</option>
-              {roles.filter((r) => r !== 'all').map((role) => (
-                <option key={role} value={role}>
-                  {role} Tier
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Role Filter */}
+        <div className="team-filter-select-wrapper">
+          <select
+            value={selectedRole}
+            onChange={(e) => onRoleChange(e.target.value)}
+            className="team-filter-select"
+            aria-label="Filter by Role"
+          >
+            {rolesList.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          {/* Status Filter */}
-          <div className="team-select-wrapper">
-            <UserCheck size={14} className="icon-muted" />
-            <select
-              value={selectedStatus}
-              onChange={(e) => onStatusChange(e.target.value)}
-              className="team-select-field"
-              aria-label="Filter by Status"
-            >
-              <option value="all">⚡ All Statuses</option>
-              {statuses.filter((s) => s !== 'all').map((st) => (
-                <option key={st} value={st}>
-                  {st} Status
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Status Filter Pills */}
+        <div className="team-status-pills" role="group" aria-label="Status Filters">
+          <button
+            type="button"
+            className={`team-status-pill ${selectedStatus === 'all' ? 'active' : ''}`}
+            onClick={() => onStatusChange('all')}
+          >
+            All Statuses
+          </button>
+          <button
+            type="button"
+            className={`team-status-pill ${selectedStatus === 'active' ? 'active' : ''}`}
+            onClick={() => onStatusChange('active')}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            className={`team-status-pill ${selectedStatus === 'on_leave' ? 'active' : ''}`}
+            onClick={() => onStatusChange('on_leave')}
+          >
+            On Leave
+          </button>
+          <button
+            type="button"
+            className={`team-status-pill ${selectedStatus === 'inactive' ? 'active' : ''}`}
+            onClick={() => onStatusChange('inactive')}
+          >
+            Inactive
+          </button>
+        </div>
+
+        {/* View Mode Switcher */}
+        <div className="team-view-toggle-group">
+          <button
+            type="button"
+            className={`team-view-btn ${viewMode === 'directory' ? 'active' : ''}`}
+            onClick={() => onViewModeChange('directory')}
+            title="Team Directory Grid"
+            aria-label="Team Directory Grid"
+          >
+            <LayoutGrid size={15} />
+            <span>Directory</span>
+          </button>
+          <button
+            type="button"
+            className={`team-view-btn ${viewMode === 'matrix' ? 'active' : ''}`}
+            onClick={() => onViewModeChange('matrix')}
+            title="RBAC Security Matrix"
+            aria-label="RBAC Security Matrix"
+          >
+            <ShieldCheck size={15} />
+            <span>RBAC Matrix</span>
+          </button>
         </div>
       </div>
     </div>

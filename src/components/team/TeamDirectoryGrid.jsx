@@ -1,40 +1,42 @@
 import React from 'react';
-import { Users, UserPlus } from 'lucide-react';
 import { TeamMemberCard } from './TeamMemberCard.jsx';
+import { Users, UserPlus } from 'lucide-react';
 
 export function TeamDirectoryGrid({
-  members = [],
-  onEditPermissions,
-  onAssignClients,
+  members,
+  onEditMember,
   onDeleteMember,
   onOpenInviteModal,
 }) {
-  if (members.length === 0) {
+  if (!members || members.length === 0) {
     return (
       <div className="team-empty-state-card">
-        <Users size={36} className="empty-icon-muted" />
-        <h4 className="empty-state-title">No team members found</h4>
-        <p className="empty-state-subtitle">Try adjusting your search query or role filter.</p>
+        <div className="empty-state-icon">
+          <Users size={36} />
+        </div>
+        <h3 className="team-empty-title">No team members match your filter</h3>
+        <p className="team-empty-desc">
+          No active seats found matching your criteria. Add new operators or reset filters.
+        </p>
         <button
           type="button"
-          className="btn-saas-primary mt-2"
+          className="btn-saas-primary"
           onClick={onOpenInviteModal}
         >
-          <UserPlus size={15} />
-          <span>Invite New Member</span>
+          <UserPlus size={16} />
+          <span>Add Team Member</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="team-directory-grid">
+    <div className="team-members-grid">
       {members.map((member) => (
         <TeamMemberCard
           key={member.id}
           member={member}
-          onEditPermissions={onEditPermissions}
-          onAssignClients={onAssignClients}
+          onEditMember={onEditMember}
           onDeleteMember={onDeleteMember}
         />
       ))}

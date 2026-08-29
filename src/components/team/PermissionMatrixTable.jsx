@@ -1,112 +1,128 @@
 import React from 'react';
-import { Shield, Check, X, Info } from 'lucide-react';
+import { Shield, CheckCircle2, XCircle, Key, Lock } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
+import { TEAM_ROLES, ROLE_DEFINITIONS } from '../../services/teamService.js';
 
-export function PermissionMatrixTable({
-  members = [],
-  onTogglePermission,
-}) {
-  const capabilities = [
-    { key: 'contentCreate', label: 'Draft Content', module: 'Content' },
-    { key: 'contentPublish', label: 'Publish Live', module: 'Content' },
-    { key: 'contentApprove', label: 'Approve Sign-offs', module: 'Content' },
-    { key: 'aiStudio', label: 'AI Studio & Models', module: 'AI Tools' },
-    { key: 'adsManage', label: 'Manage Ads', module: 'Paid Ads' },
-    { key: 'adsBudget', label: 'Scale Budgets', module: 'Paid Ads' },
-    { key: 'analyticsView', label: 'View Analytics', module: 'Reports' },
-    { key: 'analyticsExport', label: 'Export PDFs', module: 'Reports' },
-    { key: 'clientAdmin', label: 'Client Admin', module: 'Admin' },
-    { key: 'teamAdmin', label: 'Team Admin', module: 'Admin' },
+export function PermissionMatrixTable({ members = [] }) {
+  const rbacCapabilities = [
+    {
+      key: 'billing_governance',
+      label: 'Agency Billing & Plan Governance',
+      desc: 'Authority to modify subscription plans and agency settings.',
+      allowedRoles: [TEAM_ROLES.OWNER],
+    },
+    {
+      key: 'team_provisioning',
+      label: 'Team & RBAC Provisioning',
+      desc: 'Ability to onboard, update roles, and manage team member seats.',
+      allowedRoles: [TEAM_ROLES.OWNER, TEAM_ROLES.ADMIN],
+    },
+    {
+      key: 'client_admin',
+      label: 'Client Portfolio Administration',
+      desc: 'Can create, edit retainers, and soft-delete client accounts.',
+      allowedRoles: [TEAM_ROLES.OWNER, TEAM_ROLES.ADMIN],
+    },
+    {
+      key: 'action_approval',
+      label: 'Autonomous AI Action Approvals',
+      desc: 'Can review and approve P0/P1 high-impact AI marketing executions.',
+      allowedRoles: [TEAM_ROLES.OWNER, TEAM_ROLES.ADMIN, TEAM_ROLES.MANAGER],
+    },
+    {
+      key: 'campaign_ops',
+      label: 'Campaign & Content Execution',
+      desc: 'Can create, edit, and publish multi-channel campaigns.',
+      allowedRoles: [
+        TEAM_ROLES.OWNER,
+        TEAM_ROLES.ADMIN,
+        TEAM_ROLES.MANAGER,
+        TEAM_ROLES.OPERATOR,
+      ],
+    },
+    {
+      key: 'analytics_export',
+      label: 'Analytics & Performance Telemetry',
+      desc: 'Full access to ROAS tracking, client health scores, and export.',
+      allowedRoles: [
+        TEAM_ROLES.OWNER,
+        TEAM_ROLES.ADMIN,
+        TEAM_ROLES.MANAGER,
+        TEAM_ROLES.OPERATOR,
+        TEAM_ROLES.ANALYST,
+      ],
+    },
+    {
+      key: 'read_only_access',
+      label: 'Dashboard & Workspace Read Access',
+      desc: 'Can view client records and campaign dashboards in read-only mode.',
+      allowedRoles: [
+        TEAM_ROLES.OWNER,
+        TEAM_ROLES.ADMIN,
+        TEAM_ROLES.MANAGER,
+        TEAM_ROLES.OPERATOR,
+        TEAM_ROLES.ANALYST,
+        TEAM_ROLES.VIEWER,
+      ],
+    },
   ];
 
-  const getRoleVariant = (roleType) => {
-    switch (roleType) {
-      case 'Admin':
-        return 'danger';
-      case 'Manager':
-        return 'warning';
-      case 'Analyst':
-        return 'cyan';
-      default:
-        return 'primary';
-    }
-  };
+  const rolesInTable = [
+    TEAM_ROLES.OWNER,
+    TEAM_ROLES.ADMIN,
+    TEAM_ROLES.MANAGER,
+    TEAM_ROLES.OPERATOR,
+    TEAM_ROLES.ANALYST,
+    TEAM_ROLES.VIEWER,
+  ];
 
   return (
     <div className="permission-matrix-card">
-      <div className="matrix-header-strip">
-        <div className="matrix-title-group">
-          <Shield size={16} className="text-primary" />
-          <h3 className="matrix-main-title">Granular Role-Based Access Control Matrix</h3>
-        </div>
-        <div className="matrix-legend-row">
-          <span className="legend-badge-item">
-            <span className="perm-toggle-icon active"><Check size={11} /></span> Authorized
-          </span>
-          <span className="legend-badge-item">
-            <span className="perm-toggle-icon inactive"><X size={11} /></span> Restricted
-          </span>
+      <div className="matrix-header">
+        <div className="matrix-title-block">
+          <div className="matrix-badge">
+            <Key size={14} />
+            <span>Backend Enforced RBAC Matrix</span>
+          </div>
+          <h3>Role-Based Security & Permission Matrix</h3>
+          <p>
+            Cryptographically enforced by backend API tokens and multi-tenant middleware.
+          </p>
         </div>
       </div>
 
-      <div className="matrix-table-wrapper">
-        <table className="saas-table permission-table">
+      <div className="matrix-table-container">
+        <table className="saas-table matrix-table">
           <thead>
             <tr>
-              <th className="sticky-col">Team Member</th>
-              <th>Role Tier</th>
-              {capabilities.map((cap) => (
-                <th key={cap.key} className="cap-col-header" title={`${cap.module}: ${cap.label}`}>
-                  <span className="cap-module-tag">{cap.module}</span>
-                  <span className="cap-name-text">{cap.label}</span>
+              <th>System Module Capability</th>
+              {rolesInTable.map((r) => (
+                <th key={r} className="text-center">
+                  <Badge variant={ROLE_DEFINITIONS[r]?.badgeVariant || 'primary'} size="sm">
+                    {r}
+                  </Badge>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {members.map((member) => (
-              <tr key={member.id} className="matrix-member-row">
-                {/* Member Info Sticky Column */}
-                <td className="sticky-col">
-                  <div className="member-name-avatar-row">
-                    <span
-                      className="matrix-avatar-mini"
-                      style={{ background: member.avatarGradient || '#6366f1' }}
-                    >
-                      {member.avatar}
-                    </span>
-                    <div>
-                      <strong className="member-name-text">{member.name}</strong>
-                      <span className="member-email-sub">{member.email}</span>
-                    </div>
+            {rbacCapabilities.map((cap) => (
+              <tr key={cap.key}>
+                <td>
+                  <div className="capability-title-cell">
+                    <strong className="cap-label">{cap.label}</strong>
+                    <span className="cap-desc">{cap.desc}</span>
                   </div>
                 </td>
-
-                {/* Role Tier */}
-                <td>
-                  <Badge variant={getRoleVariant(member.roleType)} size="sm">
-                    {member.roleType}
-                  </Badge>
-                </td>
-
-                {/* Capability Toggle Cells */}
-                {capabilities.map((cap) => {
-                  const isAuthorized = Boolean(member.permissions?.[cap.key]);
-                  const isAdminUser = member.roleType === 'Admin';
-
+                {rolesInTable.map((roleKey) => {
+                  const isAllowed = cap.allowedRoles.includes(roleKey);
                   return (
-                    <td key={cap.key} className="text-center">
-                      <button
-                        type="button"
-                        className={`btn-perm-toggle ${isAuthorized ? 'active' : 'inactive'}`}
-                        disabled={isAdminUser && cap.key === 'teamAdmin'} // Superuser protection
-                        onClick={() =>
-                          onTogglePermission(member.id, cap.key, !isAuthorized)
-                        }
-                        title={`Click to ${isAuthorized ? 'revoke' : 'grant'} ${cap.label} for ${member.name}`}
-                      >
-                        {isAuthorized ? <Check size={13} /> : <X size={13} />}
-                      </button>
+                    <td key={roleKey} className="text-center">
+                      {isAllowed ? (
+                        <CheckCircle2 size={18} className="text-emerald inline-icon" />
+                      ) : (
+                        <XCircle size={18} className="text-muted inline-icon opacity-30" />
+                      )}
                     </td>
                   );
                 })}

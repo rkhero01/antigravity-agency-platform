@@ -1,8 +1,7 @@
-export * from './TeamHeader.jsx';
-export * from './TeamKpiCards.jsx';
-export * from './TeamMemberCard.jsx';
-export * from './TeamDirectoryGrid.jsx';
-export * from './PermissionMatrixTable.jsx';
-export * from './TeamActivityLog.jsx';
-export * from './InviteMemberModal.jsx';
-export * from './EditMemberModal.jsx';
+export { TeamHeader } from './TeamHeader.jsx';
+export { TeamKpiCards } from './TeamKpiCards.jsx';
+export { TeamDirectoryGrid } from './TeamDirectoryGrid.jsx';
+export { TeamMemberCard } from './TeamMemberCard.jsx';
+export { PermissionMatrixTable } from './PermissionMatrixTable.jsx';
+export { InviteMemberModal } from './InviteMemberModal.jsx';
+export { EditMemberModal } from './EditMemberModal.jsx';

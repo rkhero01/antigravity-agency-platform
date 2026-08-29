@@ -1,106 +1,116 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
-  Settings,
-  Shield,
-  Building,
-  Key,
-  CheckCircle2,
-  Check,
   User,
+  Shield,
+  Briefcase,
+  Clock,
+  Mail,
+  AlertCircle,
+  CheckCircle2,
+  Activity,
 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
+import { TEAM_ROLES, ROLE_DEFINITIONS } from '../../services/teamService.js';
 
 export function EditMemberModal({
   member,
   isOpen,
   onClose,
-  initialTab = 'permissions', // 'profile' | 'permissions' | 'clients'
   onSaveMember,
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '',
-    jobTitle: '',
-    roleType: 'Creator',
-    assignedClientIds: [],
-    permissions: {},
+    role: TEAM_ROLES.OPERATOR,
+    department: 'Operations & Paid Media',
+    shiftHours: '09:00 - 18:00',
+    status: 'ACTIVE',
   });
 
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
   useEffect(() => {
-    if (member) {
+    if (member && isOpen) {
       setFormData({
         name: member.name || '',
         email: member.email || '',
-        phone: member.phone || '',
-        jobTitle: member.jobTitle || '',
-        roleType: member.roleType || 'Creator',
-        assignedClientIds: member.assignedClientIds || [],
-        permissions: { ...member.permissions },
+        role: member.role || TEAM_ROLES.OPERATOR,
+        department: member.department || 'General Operations',
+        shiftHours: member.shiftHours || '09:00 - 18:00',
+        status: (member.statusRaw || member.status || 'ACTIVE').toUpperCase(),
       });
-      setActiveTab(initialTab);
+      setErrors({});
+      setApiError(null);
+      setSuccessMessage(null);
+      setIsSubmitting(false);
     }
-  }, [member, initialTab]);
+  }, [member, isOpen]);
 
   if (!isOpen || !member) return null;
 
-  const capabilities = [
-    { key: 'contentCreate', label: 'Create & Draft Content', desc: 'Can write, schedule, and assemble posts in Content Hub' },
-    { key: 'contentPublish', label: 'Direct Live Publishing', desc: 'Can publish posts immediately without approval' },
-    { key: 'contentApprove', label: 'Sign-off & Approvals', desc: 'Can approve client deliverables and lock calendars' },
-    { key: 'aiStudio', label: 'AI Studio & Copy Generation', desc: 'Full access to prompt workspace, recipes, and models' },
-    { key: 'adsManage', label: 'Manage Paid Campaigns', desc: 'Can create, pause, and inspect Meta & Google ads' },
-    { key: 'adsBudget', label: 'Scale Daily Ad Budgets', desc: 'Authority to adjust campaign spend and financial limits' },
-    { key: 'analyticsView', label: 'View Cross-Channel Analytics', desc: 'Access to performance charts and demographics' },
-    { key: 'analyticsExport', label: 'Generate Client PDF Reports', desc: 'Can export branded PDF audits and schedule deliveries' },
-    { key: 'clientAdmin', label: 'Client Workspace Administration', desc: 'Can create clients and edit brand kits' },
-    { key: 'teamAdmin', label: 'Team & Role Governance', desc: 'Can invite members and alter security matrix' },
-  ];
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.name.trim() || formData.name.trim().length < 2) {
+      newErrors.name = 'Full name is required (min 2 characters).';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim() || !emailRegex.test(formData.email.trim())) {
+      newErrors.email = 'Valid corporate email address is required.';
+    }
+    if (!formData.department.trim()) {
+      newErrors.department = 'Department is required.';
+    }
 
-  const handleTogglePermission = (key) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        [key]: !prev.permissions[key],
-      },
-    }));
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleToggleClient = (clientId) => {
-    const current = formData.assignedClientIds;
-    if (current.includes(clientId)) {
-      setFormData({
-        ...formData,
-        assignedClientIds: current.filter((id) => id !== clientId),
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setApiError(null);
+
+    if (!validate()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await onSaveMember(member.id, {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        role: formData.role,
+        department: formData.department.trim(),
+        shiftHours: formData.shiftHours.trim(),
+        status: formData.status,
       });
-    } else {
-      setFormData({
-        ...formData,
-        assignedClientIds: [...current, clientId],
-      });
+
+      setSuccessMessage(`Team member "${formData.name.trim()}" updated successfully!`);
+      setTimeout(() => {
+        onClose();
+      }, 700);
+    } catch (err) {
+      setApiError(
+        err.message || 'Failed to update member in database. Please check inputs.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSaveMember(member.id, {
-      name: formData.name,
-      jobTitle: formData.jobTitle,
-      phone: formData.phone,
-      roleType: formData.roleType,
-      role: `${formData.roleType} Specialist`,
-      assignedClientIds: formData.assignedClientIds,
-      assignedClientsCount: formData.assignedClientIds.length,
-      permissions: formData.permissions,
-    });
-    onClose();
-  };
+  const roleOptions = [
+    { role: TEAM_ROLES.ADMIN, ...ROLE_DEFINITIONS.ADMIN },
+    { role: TEAM_ROLES.MANAGER, ...ROLE_DEFINITIONS.MANAGER },
+    { role: TEAM_ROLES.OPERATOR, ...ROLE_DEFINITIONS.OPERATOR },
+    { role: TEAM_ROLES.ANALYST, ...ROLE_DEFINITIONS.ANALYST },
+    { role: TEAM_ROLES.VIEWER, ...ROLE_DEFINITIONS.VIEWER },
+  ];
 
   return (
-    <div className="modal-backdrop-overlay" onClick={onClose}>
+    <div className="modal-backdrop-overlay" onClick={isSubmitting ? undefined : onClose}>
       <div
         className="modal-dialog-card edit-member-dialog"
         onClick={(e) => e.stopPropagation()}
@@ -109,166 +119,194 @@ export function EditMemberModal({
         <div className="modal-dialog-header">
           <div className="modal-title-with-icon">
             <div className="modal-icon-badge">
-              <Settings size={18} />
+              <User size={18} />
             </div>
             <div>
-              <h3 className="modal-title">Configure Member: {member.name}</h3>
-              <p className="modal-subtitle">{member.jobTitle} • {member.email}</p>
+              <h3 className="modal-title">Edit Team Member</h3>
+              <p className="modal-subtitle">
+                Update account details and role permissions in PostgreSQL
+              </p>
             </div>
           </div>
-          <button type="button" className="btn-close-modal" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="btn-close-modal"
+            onClick={onClose}
+            aria-label="Close"
+            disabled={isSubmitting}
+          >
             <X size={18} />
           </button>
         </div>
 
-        {/* Modal Navigation Tabs */}
-        <div className="modal-subtabs-strip">
-          <button
-            type="button"
-            className={`subtab-btn ${activeTab === 'permissions' ? 'active' : ''}`}
-            onClick={() => setActiveTab('permissions')}
-          >
-            <Key size={14} />
-            <span>Granular Permissions</span>
-          </button>
-          <button
-            type="button"
-            className={`subtab-btn ${activeTab === 'clients' ? 'active' : ''}`}
-            onClick={() => setActiveTab('clients')}
-          >
-            <Building size={14} />
-            <span>Assigned Workspaces ({formData.assignedClientIds.length})</span>
-          </button>
-          <button
-            type="button"
-            className={`subtab-btn ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => setActiveTab('profile')}
-          >
-            <User size={14} />
-            <span>Profile & Role</span>
-          </button>
-        </div>
+        {/* API Error */}
+        {apiError && (
+          <div className="modal-error-banner" role="alert">
+            <AlertCircle size={18} className="error-banner-icon" />
+            <span className="error-banner-text">{apiError}</span>
+          </div>
+        )}
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="edit-member-form-body">
-          {/* TAB 1: Granular Permissions */}
-          {activeTab === 'permissions' && (
-            <div className="permissions-toggle-list">
-              <p className="tab-instructions-text">
-                Customize specific capabilities for this user. Overrides default role permissions.
-              </p>
-              {capabilities.map((cap) => {
-                const isEnabled = Boolean(formData.permissions[cap.key]);
-                return (
-                  <div
-                    key={cap.key}
-                    className={`perm-toggle-row ${isEnabled ? 'enabled' : ''}`}
-                    onClick={() => handleTogglePermission(cap.key)}
-                  >
-                    <div className="perm-text-block">
-                      <strong className="perm-label">{cap.label}</strong>
-                      <span className="perm-desc">{cap.desc}</span>
-                    </div>
+        {/* Success */}
+        {successMessage && (
+          <div className="modal-success-banner" role="status">
+            <CheckCircle2 size={18} className="success-banner-icon" />
+            <span className="success-banner-text">{successMessage}</span>
+          </div>
+        )}
 
-                    <div className={`perm-switch-box ${isEnabled ? 'on' : 'off'}`}>
-                      <div className="perm-switch-handle" />
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="modal-form-body">
+          <div className="form-grid-two-col">
+            {/* Name */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="edit-member-name">
+                Full Name <span className="text-danger">*</span>
+              </label>
+              <input
+                id="edit-member-name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (errors.name) setErrors({ ...errors, name: null });
+                }}
+                disabled={isSubmitting}
+                className={`form-text-input ${errors.name ? 'error' : ''}`}
+                required
+              />
+              {errors.name && <span className="form-error-msg">{errors.name}</span>}
             </div>
-          )}
 
-          {/* TAB 2: Assigned Clients */}
-          {activeTab === 'clients' && (
-            <div className="clients-assign-list">
-              <p className="tab-instructions-text">
-                Select which agency client workspaces this member has access to operate within.
-              </p>
-              <div className="clients-picker-grid">
-                {mockClients.map((client) => {
-                  const isChecked = formData.assignedClientIds.includes(client.id);
-                  return (
-                    <div
-                      key={client.id}
-                      className={`client-picker-card ${isChecked ? 'active' : ''}`}
-                      onClick={() => handleToggleClient(client.id)}
-                    >
-                      <div className="client-pick-left">
-                        <div className="client-check-circle">
-                          {isChecked && <Check size={12} />}
-                        </div>
-                        <div>
-                          <strong className="client-pick-name">{client.name}</strong>
-                          <span className="client-pick-industry">{client.industry}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Email */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="edit-member-email">
+                Agency Email Address <span className="text-danger">*</span>
+              </label>
+              <input
+                id="edit-member-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  if (errors.email) setErrors({ ...errors, email: null });
+                }}
+                disabled={isSubmitting}
+                className={`form-text-input ${errors.email ? 'error' : ''}`}
+                required
+              />
+              {errors.email && <span className="form-error-msg">{errors.email}</span>}
             </div>
-          )}
 
-          {/* TAB 3: Profile & Role Tier */}
-          {activeTab === 'profile' && (
-            <div className="profile-edit-fields">
-              <div className="form-grid-two-col">
-                <div className="form-field-group">
-                  <label className="form-label">Full Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="form-text-input"
-                  />
-                </div>
-                <div className="form-field-group">
-                  <label className="form-label">Job Title</label>
-                  <input
-                    type="text"
-                    value={formData.jobTitle}
-                    onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
-                    className="form-text-input"
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid-two-col">
-                <div className="form-field-group">
-                  <label className="form-label">Phone Number</label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="form-text-input"
-                  />
-                </div>
-                <div className="form-field-group">
-                  <label className="form-label">Role Tier</label>
-                  <select
-                    value={formData.roleType}
-                    onChange={(e) => setFormData({ ...formData, roleType: e.target.value })}
-                    className="form-select-input"
-                  >
-                    <option value="Admin">Admin (Full System Authority)</option>
-                    <option value="Manager">Manager (Review & Sign-off)</option>
-                    <option value="Analyst">Analyst (Paid Media & Reports)</option>
-                    <option value="Creator">Creator (Content & AI Studio)</option>
-                  </select>
-                </div>
-              </div>
+            {/* Role */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="edit-member-role">
+                Agency Role
+              </label>
+              <select
+                id="edit-member-role"
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                disabled={isSubmitting || member.role === TEAM_ROLES.OWNER}
+                className="form-select-input"
+              >
+                {member.role === TEAM_ROLES.OWNER && (
+                  <option value={TEAM_ROLES.OWNER}>Agency Owner (OWNER)</option>
+                )}
+                {roleOptions.map((opt) => (
+                  <option key={opt.role} value={opt.role}>
+                    {opt.title} ({opt.role})
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {/* Footer */}
+            {/* Department */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="edit-member-dept">
+                Department Sector
+              </label>
+              <select
+                id="edit-member-dept"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                disabled={isSubmitting}
+                className="form-select-input"
+              >
+                <option value="Operations & Paid Media">Operations & Paid Media</option>
+                <option value="Creative Strategy & Copy">Creative Strategy & Copy</option>
+                <option value="Client Success & Accounts">Client Success & Accounts</option>
+                <option value="Engineering & AI Studio">Engineering & AI Studio</option>
+                <option value="Executive Leadership">Executive Leadership</option>
+                <option value="General Operations">General Operations</option>
+              </select>
+            </div>
+
+            {/* Shift Hours */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="edit-member-shift">
+                Operating Shift Hours
+              </label>
+              <input
+                id="edit-member-shift"
+                type="text"
+                value={formData.shiftHours}
+                onChange={(e) => setFormData({ ...formData, shiftHours: e.target.value })}
+                disabled={isSubmitting}
+                className="form-text-input"
+              />
+            </div>
+
+            {/* Status */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="edit-member-status">
+                Account Status
+              </label>
+              <select
+                id="edit-member-status"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                disabled={isSubmitting}
+                className="form-select-input"
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="ON_LEAVE">On Leave</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Role Explainer Card */}
+          <div className="role-explainer-card">
+            <div className="role-explainer-header">
+              <Shield size={15} className="text-cyan" />
+              <strong>{ROLE_DEFINITIONS[formData.role]?.title || 'Role'} Permissions:</strong>
+            </div>
+            <p className="role-explainer-desc">
+              {ROLE_DEFINITIONS[formData.role]?.description || 'Agency workspace access.'}
+            </p>
+          </div>
+
+          {/* Modal Actions */}
           <div className="modal-dialog-footer">
-            <button type="button" className="btn-saas-secondary" onClick={onClose}>
+            <button
+              type="button"
+              className="btn-saas-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn-saas-primary">
-              <CheckCircle2 size={16} />
-              <span>Save Changes</span>
+            <button
+              type="submit"
+              className="btn-saas-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <span>Saving to Database...</span>
+              ) : (
+                <span>Save Changes</span>
+              )}
             </button>
           </div>
         </form>
