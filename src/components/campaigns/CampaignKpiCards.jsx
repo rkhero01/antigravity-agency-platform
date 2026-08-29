@@ -1,82 +1,80 @@
 import React from 'react';
-import { Rocket, DollarSign, TrendingUp, Target, CheckCircle2 } from 'lucide-react';
+import {
+  Rocket,
+  Activity,
+  DollarSign,
+  TrendingUp,
+  Target,
+} from 'lucide-react';
 
-export function CampaignKpiCards({ metrics = {} }) {
-  const cards = [
-    {
-      id: 'active',
-      title: 'Active Brand Campaigns',
-      value: metrics.activeCount || '4 Campaigns',
-      subtitle: 'Multi-phase strategic launches',
-      change: '100% On Schedule',
-      icon: Rocket,
-      color: '#6366f1',
-    },
-    {
-      id: 'budget',
-      title: 'Total Allocated Budget',
-      value: metrics.totalBudget || '$145,000',
-      subtitle: 'Across Meta, TikTok & Creators',
-      change: 'Strict Guardrails Active',
-      icon: DollarSign,
-      color: '#06b6d4',
-    },
-    {
-      id: 'revenue',
-      title: 'Projected Pipeline Revenue',
-      value: metrics.targetRevenue || '$890,000',
-      subtitle: 'E-commerce & Membership ARR',
-      change: '+22.4% Target Growth',
-      icon: TrendingUp,
-      color: '#10b981',
-    },
-    {
-      id: 'roas',
-      title: 'Target Campaign ROAS',
-      value: metrics.projectedRoas || '5.8x ROAS',
-      subtitle: 'Projected return on ad spend',
-      change: 'High-Efficiency Target',
-      icon: Target,
-      color: '#ec4899',
-    },
-    {
-      id: 'pacing',
-      title: 'Deliverables On Track',
-      value: metrics.deliverablesPacing || '94.2%',
-      subtitle: 'Creative assets approved on time',
-      change: 'Zero Blocked Milestones',
-      icon: CheckCircle2,
-      color: '#a855f7',
-    },
-  ];
-
+export function CampaignKpiCards({ kpis = {} }) {
   return (
-    <div className="campaign-kpis-grid">
-      {cards.map((card) => {
-        const IconComponent = card.icon;
-        return (
-          <div key={card.id} className="campaign-kpi-card">
-            <div className="kpi-top-row">
-              <span className="kpi-title-label">{card.title}</span>
-              <div
-                className="kpi-icon-pill"
-                style={{ background: `${card.color}20`, color: card.color }}
-              >
-                <IconComponent size={16} />
-              </div>
-            </div>
+    <div className="team-kpi-cards-grid">
+      {/* 1. Total Campaigns */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-violet">
+          <Rocket size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Total Campaigns</span>
+          <span className="team-kpi-val">{kpis.total || 0}</span>
+          <span className="team-kpi-sub">Managed in workspace</span>
+        </div>
+      </div>
 
-            <div className="kpi-value-block">
-              <span className="kpi-main-number">{card.value}</span>
-            </div>
+      {/* 2. Active Blitzes */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-emerald">
+          <Activity size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Active Campaigns</span>
+          <span className="team-kpi-val text-emerald">{kpis.active || 0}</span>
+          <span className="team-kpi-sub">Currently delivering</span>
+        </div>
+      </div>
 
-            <div className="kpi-bottom-row">
-              <span className="kpi-change-tag positive">{card.change}</span>
-              <span className="kpi-subtext">{card.subtitle}</span>
-            </div>
-          </div>
-        );
-      })}
+      {/* 3. Total Daily Budget */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-gold">
+          <DollarSign size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Allocated Daily Budget</span>
+          <span className="team-kpi-val text-gold">
+            ${(kpis.totalDailyBudget || 0).toLocaleString()}
+          </span>
+          <span className="team-kpi-sub">Daily run-rate</span>
+        </div>
+      </div>
+
+      {/* 4. Total Conversions */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-cyan">
+          <Target size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Total Conversions</span>
+          <span className="team-kpi-val text-cyan">
+            {(kpis.totalConversions || 0).toLocaleString()}
+          </span>
+          <span className="team-kpi-sub">Acquired leads & sales</span>
+        </div>
+      </div>
+
+      {/* 5. Overall ROAS */}
+      <div className="team-kpi-card">
+        <div className="team-kpi-icon-pill bg-indigo">
+          <TrendingUp size={18} />
+        </div>
+        <div className="team-kpi-body">
+          <span className="team-kpi-label">Overall ROAS</span>
+          <span className="team-kpi-val text-indigo">
+            {kpis.roas ? `${kpis.roas}x` : 'N/A'}
+          </span>
+          <span className="team-kpi-sub">Return on ad spend</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ export * from './apiClient.js';
 export * from './authSessionService.js';
 export * from './clientsService.js';
 export * from './socialAccountsService.js';
+export * from './campaignsService.js';
 export * from './contentService.js';
 export * from './aiService.js';
 export * from './adsService.js';

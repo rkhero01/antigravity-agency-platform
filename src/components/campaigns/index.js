@@ -1,8 +1,10 @@
-export * from './CampaignHeader.jsx';
-export * from './CampaignKpiCards.jsx';
-export * from './CampaignCard.jsx';
-export * from './CampaignsGrid.jsx';
-export * from './CampaignTimelineTab.jsx';
-export * from './CampaignDetailModal.jsx';
-export * from './CreateCampaignModal.jsx';
-export * from './AICampaignRoadmapModal.jsx';
+export { CampaignHeader } from './CampaignHeader.jsx';
+export { CampaignKpiCards } from './CampaignKpiCards.jsx';
+export { CampaignsGrid } from './CampaignsGrid.jsx';
+export { CampaignsTable } from './CampaignsTable.jsx';
+export { CampaignCard } from './CampaignCard.jsx';
+export { CreateCampaignModal } from './CreateCampaignModal.jsx';
+export { EditCampaignModal } from './EditCampaignModal.jsx';
+export { CampaignDetailModal } from './CampaignDetailModal.jsx';
+export { CampaignTimelineTab } from './CampaignTimelineTab.jsx';
+export { AICampaignRoadmapModal } from './AICampaignRoadmapModal.jsx';

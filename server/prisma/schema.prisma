@@ -198,29 +198,36 @@ model Lead {
 // ------------------------------------------------------------------------------
 
 model Campaign {
-  id              String           @id @default(uuid())
-  agencyId        String
-  clientId        String
-  platform        String           // META, GOOGLE, LINKEDIN
-  name            String
-  objective       String           @default("LEAD_GENERATION")
-  dailyBudget     Float            @default(0)
-  totalSpend      Float            @default(0)
-  impressions     Int              @default(0)
-  clicks          Int              @default(0)
-  conversions     Int              @default(0)
-  revenue         Float            @default(0)
-  status          String           @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedAt       DateTime?
+  id                 String           @id @default(uuid())
+  agencyId           String
+  clientId           String
+  socialAccountId    String?
+  platform           String           // META, GOOGLE, LINKEDIN, TIKTOK, TWITTER
+  name               String
+  objective          String           @default("LEAD_GENERATION")
+  dailyBudget        Float            @default(0)
+  budgetType         String           @default("DAILY") // DAILY, LIFETIME
+  startDate          DateTime?
+  endDate            DateTime?
+  externalCampaignId String?
+  totalSpend         Float            @default(0)
+  impressions        Int              @default(0)
+  clicks             Int              @default(0)
+  conversions        Int              @default(0)
+  revenue            Float            @default(0)
+  status             String           @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
 
-  agency          Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  metrics         CampaignMetric[]
+  agency             Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client             Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  socialAccount      SocialAccount?   @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  metrics            CampaignMetric[]
 
   @@index([agencyId])
   @@index([clientId])
+  @@index([socialAccountId])
   @@index([platform])
   @@index([status])
 }
@@ -247,23 +254,24 @@ model CampaignMetric {
 // ------------------------------------------------------------------------------
 
 model SocialAccount {
-  id                String    @id @default(uuid())
+  id                String     @id @default(uuid())
   agencyId          String
   clientId          String?
-  platform          String    // META, FACEBOOK, INSTAGRAM, GOOGLE_BUSINESS, YOUTUBE, LINKEDIN
+  platform          String     // META, FACEBOOK, INSTAGRAM, GOOGLE_BUSINESS, YOUTUBE, LINKEDIN
   accountName       String
   handle            String?
   platformAccountId String?
-  status            String    @default("ACTIVE") // ACTIVE, NEEDS_REAUTH, DISCONNECTED, ERROR
+  status            String     @default("ACTIVE") // ACTIVE, NEEDS_REAUTH, DISCONNECTED, ERROR
   tokenExpiresAt    DateTime?
   scopes            String?
   metadataJson      String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
   deletedAt         DateTime?
 
-  agency            Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  client            Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  agency            Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client            Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  campaigns         Campaign[]
 
   @@index([agencyId])
   @@index([clientId])

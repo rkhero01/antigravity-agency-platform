@@ -1,6 +1,6 @@
 /**
  * Paid Media Campaign Routes
- * Task 28 — Step 2: Campaign Routes
+ * Task 6: Campaign Endpoints with Full CRUD & Soft Deletion
  */
 
 import { Router } from 'express';
@@ -14,8 +14,9 @@ campaignRoutes.use(requireAuthentication);
 campaignRoutes.use(tenantScopeMiddleware);
 
 campaignRoutes.get('/', campaignController.listCampaigns);
-campaignRoutes.get('/:campaignId', campaignController.getCampaignById);
+campaignRoutes.get('/:id', campaignController.getCampaignById);
 campaignRoutes.post('/', campaignController.createCampaign);
-campaignRoutes.patch('/:campaignId', campaignController.updateCampaign);
+campaignRoutes.patch('/:id', campaignController.updateCampaign);
+campaignRoutes.delete('/:id', campaignController.archiveCampaign);
 
 export default campaignRoutes;

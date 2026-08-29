@@ -1,123 +1,148 @@
 import React from 'react';
-import { Rocket, Calendar, DollarSign, TrendingUp, Eye, Trash2, CheckCircle2, Layers } from 'lucide-react';
+import {
+  Rocket,
+  Building,
+  Target,
+  DollarSign,
+  TrendingUp,
+  Edit2,
+  Trash2,
+  Eye,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 
 export function CampaignCard({
   campaign,
   onInspect,
-  onDeleteCampaign,
+  onEdit,
+  onArchive,
 }) {
-  const getStatusBadge = (status) => {
-    if (status === 'Live Blitz') return <Badge variant="danger" size="sm">🔥 {status}</Badge>;
-    if (status === 'Creative Production') return <Badge variant="primary" size="sm">🎨 {status}</Badge>;
-    if (status === 'Pre-Launch Teaser') return <Badge variant="warning" size="sm">⚡ {status}</Badge>;
-    return <Badge variant="neutral" size="sm">📝 {status}</Badge>;
+  const getPlatformGradient = (platform) => {
+    switch ((platform || '').toUpperCase()) {
+      case 'META':
+        return 'linear-gradient(135deg, #1877f2, #0d65d9)';
+      case 'GOOGLE':
+        return 'linear-gradient(135deg, #4285f4, #34a853)';
+      case 'LINKEDIN':
+        return 'linear-gradient(135deg, #0a66c2, #004182)';
+      case 'TIKTOK':
+        return 'linear-gradient(135deg, #00f2fe, #4facfe)';
+      case 'TWITTER':
+        return 'linear-gradient(135deg, #1da1f2, #0c85d0)';
+      default:
+        return 'linear-gradient(135deg, #6366f1, #3b82f6)';
+    }
   };
 
+  const isArchived = (campaign.status || '').toUpperCase() === 'ARCHIVED';
+
   return (
-    <div className="campaign-card-item">
-      {/* Header */}
-      <div className="campaign-card-header">
-        <span className="campaign-client-tag">🏢 {campaign.clientName}</span>
-        {getStatusBadge(campaign.status)}
-      </div>
+    <div className={`social-account-card ${isArchived ? 'card-expired' : ''}`}>
+      {/* Platform Header Stripe */}
+      <div
+        className="card-platform-strip"
+        style={{ background: getPlatformGradient(campaign.platform) }}
+      />
 
-      {/* Title & Dates */}
-      <div className="campaign-title-block">
-        <h3 className="campaign-title" title={campaign.title}>
-          {campaign.title}
-        </h3>
-        <div className="campaign-date-pill">
-          <Calendar size={12} className="inline-icon" />
-          <span>{campaign.startDate} — {campaign.endDate}</span>
-        </div>
-      </div>
-
-      {/* Financial Targets Grid */}
-      <div className="campaign-financials-grid">
-        <div className="cf-block">
-          <span className="cf-lbl">Budget</span>
-          <strong className="cf-val text-cyan">{campaign.budget}</strong>
-        </div>
-        <div className="cf-block">
-          <span className="cf-lbl">Target Pipeline</span>
-          <strong className="cf-val text-success">{campaign.targetRevenue}</strong>
-        </div>
-        <div className="cf-block">
-          <span className="cf-lbl">Target ROAS</span>
-          <strong className="cf-val text-primary">{campaign.projectedRoas}</strong>
-        </div>
-      </div>
-
-      {/* Channel Distribution */}
-      <div className="campaign-channels-box">
-        <span className="channels-lbl">Omnichannel Budget Split:</span>
-        <div className="channel-split-bar">
-          {campaign.channelSplit.map((ch, idx) => (
-            <div
-              key={idx}
-              className="split-segment"
-              style={{ width: `${ch.percentage}%`, background: ch.color }}
-              title={`${ch.channel}: ${ch.percentage}%`}
-            />
-          ))}
-        </div>
-        <div className="channel-legend-row">
-          {campaign.channelSplit.map((ch, idx) => (
-            <span key={idx} className="legend-item">
-              <span className="legend-dot" style={{ background: ch.color }} />
-              {ch.channel.split(' ')[0]} ({ch.percentage}%)
+      <div className="card-main-body">
+        {/* Header */}
+        <div className="card-header-row">
+          <div className="account-handle-block">
+            <span className="platform-tag-pill">{campaign.platform}</span>
+            <h4 className="account-handle-text">{campaign.name || campaign.title}</h4>
+            <span className="account-client-tag">
+              <Building size={12} className="inline-icon" /> {campaign.clientName || 'Assigned Client'}
             </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Moodboard Swatches & Deliverables */}
-      <div className="campaign-moodboard-strip">
-        <div className="moodboard-palette-dots">
-          {campaign.moodboard.palette.map((color, idx) => (
-            <span
-              key={idx}
-              className="palette-swatch"
-              style={{ background: color }}
-              title={color}
-            />
-          ))}
-        </div>
-
-        <div className="deliverables-progress-block">
-          <div className="deliv-head">
-            <span className="deliv-lbl">Deliverables</span>
-            <strong className="deliv-val">{campaign.deliverables.completed}/{campaign.deliverables.total} ({campaign.deliverables.percentage}%)</strong>
           </div>
-          <div className="deliv-bar">
-            <div
-              className="deliv-fill"
-              style={{ width: `${campaign.deliverables.percentage}%` }}
-            />
+
+          <div className="account-status-badge-box">
+            <Badge variant={campaign.statusVariant || 'primary'}>
+              {campaign.status}
+            </Badge>
           </div>
         </div>
-      </div>
 
-      {/* Footer */}
-      <div className="campaign-card-footer">
-        <button
-          type="button"
-          className="btn-inspect-brief"
-          onClick={() => onInspect(campaign)}
-        >
-          <Eye size={13} />
-          <span>Inspect Full Brief</span>
-        </button>
+        {/* Objective */}
+        <div className="campaign-objective-badge-row mt-2">
+          <span className="campaign-objective-pill">
+            <Target size={11} className="inline-icon" /> {campaign.objective}
+          </span>
+          {campaign.socialAccountName && (
+            <span className="social-account-link-pill">
+              🔗 {campaign.socialAccountName}
+            </span>
+          )}
+        </div>
 
-        <button
-          type="button"
-          className="btn-delete-campaign"
-          onClick={() => onDeleteCampaign(campaign.id)}
-          title="Delete campaign"
-        >
-          <Trash2 size={13} />
-        </button>
+        {/* Budget & Metrics Grid */}
+        <div className="account-diagnostics-grid mt-3">
+          <div className="diag-item">
+            <span className="diag-label">
+              <DollarSign size={11} className="inline-icon" /> Daily Budget
+            </span>
+            <strong className="diag-val text-emerald">
+              ${(campaign.dailyBudget || 0).toLocaleString()}
+            </strong>
+          </div>
+
+          <div className="diag-item">
+            <span className="diag-label">
+              <TrendingUp size={11} className="inline-icon" /> Total Spend
+            </span>
+            <strong className="diag-val">
+              ${(campaign.spend || campaign.totalSpend || 0).toLocaleString()}
+            </strong>
+          </div>
+
+          <div className="diag-item">
+            <span className="diag-label">Conversions</span>
+            <strong className="diag-val text-cyan">
+              {(campaign.conversions || 0).toLocaleString()}
+            </strong>
+          </div>
+
+          <div className="diag-item">
+            <span className="diag-label">ROAS</span>
+            <strong className="diag-val text-gold">
+              {campaign.metrics?.roas || '0.00x'}
+            </strong>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="card-actions-footer">
+          <button
+            type="button"
+            className="btn-inspect-action"
+            onClick={() => onInspect(campaign)}
+            title="Inspect Campaign Details"
+          >
+            <Eye size={13} />
+            <span>Details</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-sync-action"
+            onClick={() => onEdit(campaign)}
+            title="Edit Campaign Settings"
+          >
+            <Edit2 size={13} />
+            <span>Edit</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-disconnect-action"
+            onClick={() => onArchive(campaign.id)}
+            title="Archive Campaign"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
     </div>
   );

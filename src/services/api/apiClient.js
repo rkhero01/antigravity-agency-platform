@@ -297,6 +297,7 @@ class ApiClient {
       get: (id) => this.get(`/api/v1/campaigns/${id}`),
       create: (data) => this.post('/api/v1/campaigns', data),
       update: (id, data) => this.patch(`/api/v1/campaigns/${id}`, data),
+      delete: (id) => this.delete(`/api/v1/campaigns/${id}`),
     };
   }
 

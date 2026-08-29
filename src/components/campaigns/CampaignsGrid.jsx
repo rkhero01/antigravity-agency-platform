@@ -1,39 +1,45 @@
 import React from 'react';
-import { Rocket, Plus } from 'lucide-react';
 import { CampaignCard } from './CampaignCard.jsx';
+import { Rocket, Plus } from 'lucide-react';
 
 export function CampaignsGrid({
   campaigns = [],
   onInspect,
-  onDeleteCampaign,
+  onEdit,
+  onArchive,
   onOpenCreateModal,
 }) {
   if (campaigns.length === 0) {
     return (
-      <div className="campaigns-empty-state-card">
-        <Rocket size={36} className="empty-icon-muted" />
-        <h4 className="empty-state-title">No campaign briefs found</h4>
-        <p className="empty-state-subtitle">Adjust your filter criteria or plan a new multi-channel marketing campaign.</p>
+      <div className="team-empty-state-card">
+        <div className="empty-state-icon">
+          <Rocket size={36} />
+        </div>
+        <h3 className="team-empty-title">No campaigns found</h3>
+        <p className="team-empty-desc">
+          No paid campaigns matched your filters. Create a new campaign to begin deploying and optimizing multi-channel ad spend.
+        </p>
         <button
           type="button"
-          className="btn-saas-primary mt-2"
+          className="btn-saas-primary"
           onClick={onOpenCreateModal}
         >
-          <Plus size={15} />
-          <span>New Campaign Brief</span>
+          <Plus size={16} />
+          <span>Create Campaign</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="campaigns-cards-grid">
-      {campaigns.map((camp) => (
+    <div className="team-members-grid">
+      {campaigns.map((campaign) => (
         <CampaignCard
-          key={camp.id}
-          campaign={camp}
+          key={campaign.id}
+          campaign={campaign}
           onInspect={onInspect}
-          onDeleteCampaign={onDeleteCampaign}
+          onEdit={onEdit}
+          onArchive={onArchive}
         />
       ))}
     </div>
