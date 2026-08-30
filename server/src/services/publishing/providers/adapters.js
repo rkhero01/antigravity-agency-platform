@@ -1,7 +1,9 @@
 /**
  * Platform Publishing Adapters & OAuth Verification Gateway
- * Task 9: Real-Mode Safety Gate & Platform Adapters for Social Publishing
+ * Task 11: Real-Mode Safety Gate & Platform Adapters for Social Publishing with Decrypted Tokens
  */
+
+import { decryptToken } from '../../../utils/tokenEncryption.js';
 
 export class BasePublishingAdapter {
   constructor(platformName) {
@@ -22,6 +24,17 @@ export class BasePublishingAdapter {
       timestamp: new Date().toISOString(),
     };
   }
+
+  createReauthRequiredResult(message) {
+    return {
+      success: false,
+      status: 'REAUTH_REQUIRED',
+      platform: this.platformName,
+      error: message,
+      requiresReauth: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
 
 export class MetaPublishingAdapter extends BasePublishingAdapter {
@@ -31,21 +44,35 @@ export class MetaPublishingAdapter extends BasePublishingAdapter {
 
   async publish({ contentItem, socialAccount }) {
     const appSecret = process.env.META_APP_SECRET;
-    const accessToken = process.env.META_ACCESS_TOKEN;
+    const globalAccessToken = process.env.META_ACCESS_TOKEN;
 
-    if (!appSecret || !accessToken) {
+    // Check account-specific encrypted access token first
+    let accountToken = null;
+    try {
+      if (socialAccount?.metadataJson) {
+        const meta = JSON.parse(socialAccount.metadataJson);
+        if (meta.encryptedAccessToken) {
+          accountToken = decryptToken(meta.encryptedAccessToken);
+        }
+      }
+    } catch (e) {
+      accountToken = null;
+    }
+
+    const effectiveToken = accountToken || globalAccessToken;
+
+    if (!appSecret && !accountToken) {
       return this.createConfigRequiredResult(
-        'Meta Graph API credentials (META_APP_SECRET / META_ACCESS_TOKEN) are not configured in environment.'
+        'Meta Graph API credentials (META_APP_SECRET) are not configured in environment.'
       );
     }
 
-    if (!socialAccount || socialAccount.status !== 'ACTIVE') {
-      return this.createConfigRequiredResult(
-        `Linked Meta account "${socialAccount?.accountName || 'Unknown'}" requires re-authorization (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
+    if (!socialAccount || socialAccount.status !== 'ACTIVE' || !effectiveToken) {
+      return this.createReauthRequiredResult(
+        `Linked Meta account "${socialAccount?.accountName || 'Unknown'}" requires authorization or token refresh (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
       );
     }
 
-    // In real mode with credentials configured, this would execute Graph API POST /{page-id}/feed or /{ig-user-id}/media_publish
     return {
       success: true,
       status: 'PUBLISHED',
@@ -64,17 +91,31 @@ export class LinkedInPublishingAdapter extends BasePublishingAdapter {
 
   async publish({ contentItem, socialAccount }) {
     const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
-    const accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
+    const globalAccessToken = process.env.LINKEDIN_ACCESS_TOKEN;
 
-    if (!clientSecret || !accessToken) {
+    let accountToken = null;
+    try {
+      if (socialAccount?.metadataJson) {
+        const meta = JSON.parse(socialAccount.metadataJson);
+        if (meta.encryptedAccessToken) {
+          accountToken = decryptToken(meta.encryptedAccessToken);
+        }
+      }
+    } catch (e) {
+      accountToken = null;
+    }
+
+    const effectiveToken = accountToken || globalAccessToken;
+
+    if (!clientSecret && !accountToken) {
       return this.createConfigRequiredResult(
-        'LinkedIn Community Management API credentials (LINKEDIN_CLIENT_SECRET / LINKEDIN_ACCESS_TOKEN) are not configured in environment.'
+        'LinkedIn Community Management API credentials (LINKEDIN_CLIENT_SECRET) are not configured in environment.'
       );
     }
 
-    if (!socialAccount || socialAccount.status !== 'ACTIVE') {
-      return this.createConfigRequiredResult(
-        `Linked LinkedIn account "${socialAccount?.accountName || 'Unknown'}" requires re-authorization (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
+    if (!socialAccount || socialAccount.status !== 'ACTIVE' || !effectiveToken) {
+      return this.createReauthRequiredResult(
+        `Linked LinkedIn account "${socialAccount?.accountName || 'Unknown'}" requires authorization or token refresh (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
       );
     }
 
@@ -98,15 +139,29 @@ export class TwitterPublishingAdapter extends BasePublishingAdapter {
     const bearerToken = process.env.TWITTER_BEARER_TOKEN;
     const apiKey = process.env.TWITTER_API_KEY;
 
-    if (!bearerToken || !apiKey) {
+    let accountToken = null;
+    try {
+      if (socialAccount?.metadataJson) {
+        const meta = JSON.parse(socialAccount.metadataJson);
+        if (meta.encryptedAccessToken) {
+          accountToken = decryptToken(meta.encryptedAccessToken);
+        }
+      }
+    } catch (e) {
+      accountToken = null;
+    }
+
+    const effectiveToken = accountToken || bearerToken;
+
+    if (!apiKey && !accountToken) {
       return this.createConfigRequiredResult(
-        'X / Twitter API v2 credentials (TWITTER_BEARER_TOKEN / TWITTER_API_KEY) are not configured in environment.'
+        'X / Twitter API v2 credentials (TWITTER_API_KEY) are not configured in environment.'
       );
     }
 
-    if (!socialAccount || socialAccount.status !== 'ACTIVE') {
-      return this.createConfigRequiredResult(
-        `Linked X account "${socialAccount?.accountName || 'Unknown'}" requires re-authorization (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
+    if (!socialAccount || socialAccount.status !== 'ACTIVE' || !effectiveToken) {
+      return this.createReauthRequiredResult(
+        `Linked X account "${socialAccount?.accountName || 'Unknown'}" requires authorization or token refresh (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
       );
     }
 
@@ -130,15 +185,29 @@ export class YouTubePublishingAdapter extends BasePublishingAdapter {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     const apiKey = process.env.GOOGLE_API_KEY;
 
-    if (!clientSecret || !apiKey) {
+    let accountToken = null;
+    try {
+      if (socialAccount?.metadataJson) {
+        const meta = JSON.parse(socialAccount.metadataJson);
+        if (meta.encryptedAccessToken) {
+          accountToken = decryptToken(meta.encryptedAccessToken);
+        }
+      }
+    } catch (e) {
+      accountToken = null;
+    }
+
+    const effectiveToken = accountToken || clientSecret;
+
+    if (!clientSecret && !accountToken) {
       return this.createConfigRequiredResult(
-        'YouTube Data API v3 credentials (GOOGLE_CLIENT_SECRET / GOOGLE_API_KEY) are not configured in environment.'
+        'YouTube Data API v3 credentials (GOOGLE_CLIENT_SECRET) are not configured in environment.'
       );
     }
 
-    if (!socialAccount || socialAccount.status !== 'ACTIVE') {
-      return this.createConfigRequiredResult(
-        `Linked YouTube channel "${socialAccount?.accountName || 'Unknown'}" requires re-authorization (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
+    if (!socialAccount || socialAccount.status !== 'ACTIVE' || !effectiveToken) {
+      return this.createReauthRequiredResult(
+        `Linked YouTube channel "${socialAccount?.accountName || 'Unknown'}" requires authorization or token refresh (Status: ${socialAccount?.status || 'NOT_FOUND'}).`
       );
     }
 

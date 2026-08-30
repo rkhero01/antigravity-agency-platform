@@ -172,21 +172,40 @@ export const socialAccountsService = {
    */
   async getOAuthStatus() {
     try {
-      const response = await apiClient.socialAccounts.getOAuthStatus();
-      return response.data?.oauthStatus || {
+      const response = await apiClient.integrations.status();
+      return response.data?.providers || {
         META: false,
+        FACEBOOK: false,
+        INSTAGRAM: false,
+        GOOGLE: false,
         GOOGLE_BUSINESS: false,
         YOUTUBE: false,
         LINKEDIN: false,
+        TWITTER: false,
       };
     } catch (e) {
-      return {
-        META: false,
-        GOOGLE_BUSINESS: false,
-        YOUTUBE: false,
-        LINKEDIN: false,
-      };
+      try {
+        const fallback = await apiClient.socialAccounts.getOAuthStatus();
+        return fallback.data?.oauthStatus || {};
+      } catch (err) {
+        return {
+          META: false,
+          GOOGLE_BUSINESS: false,
+          YOUTUBE: false,
+          LINKEDIN: false,
+        };
+      }
     }
+  },
+
+  /**
+   * Initiate real OAuth redirection flow for external platform
+   */
+  async initiateOAuthConnect(platform, clientId = null) {
+    const response = await apiClient.integrations.connect(platform.toLowerCase(), {
+      clientId: clientId && clientId !== 'all' ? clientId : undefined,
+    });
+    return response.data;
   },
 
   /**

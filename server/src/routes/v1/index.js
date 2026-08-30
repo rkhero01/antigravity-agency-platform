@@ -22,6 +22,7 @@ import { socialAccountRoutes } from './socialAccountRoutes.js';
 import { contentRoutes } from './contentRoutes.js';
 import { publishingRoutes } from './publishingRoutes.js';
 import { analyticsRoutes } from './analyticsRoutes.js';
+import { integrationRoutes } from './integrationRoutes.js';
 
 export const v1Router = Router();
 
@@ -44,5 +45,6 @@ v1Router.use('/social-accounts', socialAccountRoutes);
 v1Router.use('/content', contentRoutes);
 v1Router.use('/publishing', publishingRoutes);
 v1Router.use('/analytics', analyticsRoutes);
+v1Router.use('/integrations', integrationRoutes);
 
 export default v1Router;
