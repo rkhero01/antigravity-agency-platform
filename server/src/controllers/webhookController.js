@@ -1,65 +1,66 @@
 /**
- * Webhook Controller
- * Task 28 — Step 1: Webhook Ingestion & Signature Verification
+ * Webhook Ingestion & Subscription Controller
+ * Task 13 — Phase 2: Meta Verification, Ingestion Pipeline & Subscription Management
  */
 
-import { webhookVerifier } from '../webhooks/webhookVerifier.js';
+import { webhookService } from '../services/webhooks/webhookService.js';
 import { webhookDeduplicator } from '../webhooks/webhookDeduplicator.js';
 import { webhookNormalizer } from '../webhooks/webhookNormalizer.js';
-import { sendSuccess, sendError } from '../utils/response.js';
-import { ValidationError, AuthenticationError } from '../utils/errors.js';
+import { sendSuccess } from '../utils/response.js';
+import { ValidationError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
-export async function handleMetaWebhook(req, res, next) {
+function checkWebhookMutationPermission(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage webhook subscriptions.');
+  }
+}
+
+/**
+ * Public Meta GET Webhook Verification Handler
+ */
+export async function handleMetaGetVerification(req, res, next) {
   try {
-    const signature = req.header('x-hub-signature-256');
-    const timestamp = req.header('x-webhook-timestamp') || Math.floor(Date.now() / 1000);
-    const agencyId = req.query.agencyId || 'agency-demo-001';
-
-    // 1. Timestamp Replay Drift Check
-    const timeCheck = webhookVerifier.verifyTimestamp(timestamp);
-    if (!timeCheck.isValid) {
-      throw new ValidationError(timeCheck.reason);
+    const result = await webhookService.verifyMetaWebhook(req.query);
+    if (result.isValid) {
+      return res.status(200).send(result.challenge);
     }
-
-    // 2. Signature Verification (Simulated with secret or real)
-    const webhookSecret = process.env.META_WA_WEBHOOK_SECRET || 'demo-webhook-secret-2026';
-    if (signature) {
-      const sigCheck = webhookVerifier.verifyMetaSignature(req.body, signature, webhookSecret);
-      if (!sigCheck.isValid) {
-        throw new AuthenticationError(`Invalid webhook signature: ${sigCheck.reason}`);
-      }
-    }
-
-    // 3. Normalize Event
-    const normalized = webhookNormalizer.normalizeWhatsAppWebhook(req.body);
-
-    // 4. Deduplicate Event
-    const dedupResult = await webhookDeduplicator.processEvent(
-      agencyId,
-      'META_WHATSAPP',
-      normalized.eventId,
-      normalized.eventType,
-      normalized
-    );
-
-    if (dedupResult.isDuplicate) {
-      return sendSuccess(res, {
-        status: 'IGNORED_DUPLICATE',
-        eventId: normalized.eventId,
-        message: 'Duplicate webhook event already processed.',
-      });
-    }
-
-    return sendSuccess(res, {
-      status: 'PROCESSED_SANDBOX',
-      eventId: normalized.eventId,
-      eventType: normalized.eventType,
+    return res.status(403).json({
+      error: 'FORBIDDEN',
+      message: result.reason || 'Verification token mismatch',
     });
   } catch (err) {
     next(err);
   }
 }
 
+/**
+ * Public Meta POST Webhook Ingestion Handler
+ */
+export async function handleMetaWebhook(req, res, next) {
+  try {
+    const signature = req.header('x-hub-signature-256');
+    const timestamp = req.header('x-webhook-timestamp');
+    const expectedAgencyId = req.query.agencyId || null;
+
+    const result = await webhookService.processMetaWebhook({
+      signature,
+      timestamp,
+      rawBody: req.body,
+      payload: req.body,
+      expectedAgencyId,
+    });
+
+    return sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Public CRM Webhook Ingestion Handler
+ */
 export async function handleCRMWebhook(req, res, next) {
   try {
     const agencyId = req.query.agencyId || 'agency-demo-001';
@@ -90,9 +91,71 @@ export async function handleCRMWebhook(req, res, next) {
   }
 }
 
+/**
+ * Authenticated Webhook Provider Status
+ */
+export async function getWebhookStatus(req, res, next) {
+  try {
+    const status = webhookService.getWebhookStatus();
+    return sendSuccess(res, { providers: status });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Authenticated Tenant Webhook Subscriptions
+ */
+export async function listSubscriptions(req, res, next) {
+  try {
+    const subscriptions = await webhookService.listSubscriptions(req.agencyId, req.query);
+    return sendSuccess(res, { subscriptions });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Authenticated Create Webhook Subscription
+ */
+export async function createSubscription(req, res, next) {
+  try {
+    checkWebhookMutationPermission(req.user.role);
+    const { provider } = req.params;
+    const result = await webhookService.createSubscription({
+      ...req.body,
+      provider,
+      agencyId: req.agencyId,
+      user: req.user,
+    });
+    return sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Authenticated Delete Webhook Subscription
+ */
+export async function deleteSubscription(req, res, next) {
+  try {
+    checkWebhookMutationPermission(req.user.role);
+    const { id } = req.params;
+    const result = await webhookService.deleteSubscription(id, req.agencyId, req.user);
+    return sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const webhookController = {
+  handleMetaGetVerification,
   handleMetaWebhook,
   handleCRMWebhook,
+  getWebhookStatus,
+  listSubscriptions,
+  createSubscription,
+  deleteSubscription,
 };
 
 export default webhookController;
