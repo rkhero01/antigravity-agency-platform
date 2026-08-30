@@ -1,6 +1,6 @@
 /**
  * Content Management & Editorial Controller
- * Task 8: REST Controller with RBAC for Multi-Tenant Content
+ * Task 8 & 18: REST Controller with RBAC for Multi-Tenant Content Command Center
  */
 
 import { contentService } from '../services/contentService.js';
@@ -31,6 +31,9 @@ export async function listContent(req, res, next) {
       platform: req.query.platform,
       format: req.query.format,
       status: req.query.status,
+      editorialStatus: req.query.editorialStatus,
+      searchIntent: req.query.searchIntent,
+      primaryKeyword: req.query.primaryKeyword,
       search: req.query.search,
     };
     const content = await contentService.listContent(req.agencyId, filters);
@@ -50,6 +53,7 @@ export async function getCalendar(req, res, next) {
       platform: req.query.platform,
       format: req.query.format,
       status: req.query.status,
+      editorialStatus: req.query.editorialStatus,
     };
     const events = await contentService.getCalendar(req.agencyId, filters);
     return sendSuccess(res, { events });
@@ -81,6 +85,36 @@ export async function updateContent(req, res, next) {
   try {
     checkMutationPermissions(req.user.role);
     const updated = await contentService.updateContent(req.params.id, req.body, req.agencyId, req.user);
+    return sendSuccess(res, { content: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function saveBrief(req, res, next) {
+  try {
+    checkMutationPermissions(req.user.role);
+    const updated = await contentService.saveBrief(req.params.id, req.body, req.agencyId, req.user);
+    return sendSuccess(res, { content: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function saveSeoMetadata(req, res, next) {
+  try {
+    checkMutationPermissions(req.user.role);
+    const updated = await contentService.saveSeoMetadata(req.params.id, req.body, req.agencyId, req.user);
+    return sendSuccess(res, { content: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function submitReview(req, res, next) {
+  try {
+    checkMutationPermissions(req.user.role);
+    const updated = await contentService.submitForReview(req.params.id, req.agencyId, req.user);
     return sendSuccess(res, { content: updated });
   } catch (err) {
     next(err);
@@ -119,6 +153,16 @@ export async function rejectContent(req, res, next) {
   }
 }
 
+export async function archiveContent(req, res, next) {
+  try {
+    checkMutationPermissions(req.user.role);
+    const result = await contentService.archiveContent(req.params.id, req.agencyId, req.user);
+    return sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteContent(req, res, next) {
   try {
     checkMutationPermissions(req.user.role);
@@ -135,10 +179,15 @@ export const contentController = {
   getContentById,
   createContent,
   updateContent,
+  saveBrief,
+  saveSeoMetadata,
+  submitReview,
   scheduleContent,
   approveContent,
   rejectContent,
+  archiveContent,
   deleteContent,
 };
 
 export default contentController;
+

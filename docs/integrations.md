@@ -344,6 +344,33 @@ The retry policy engine (`retryPolicy.js`) deterministically categorizes executi
   - `THIN_CONTENT` (< 300 words)
 - **Health Score Synthesis**: Bounded (0–100) scoring based on severity weights (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
 
+---
+
+## 13. Content Command Center & Editorial Pipeline
+
+### A. Content Metadata & Storage Architecture
+- **Content Idea Pipeline**: Stored under `ContentItem.metadataJson.contentIdea` (`topic`, `angle`, `targetAudience`, `objective`, `priority` [`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`], `status` [`IDEA`, `RESEARCHING`, `BRIEF_READY`, `IN_PRODUCTION`, `READY_FOR_REVIEW`, `APPROVED`, `SCHEDULED`, `PUBLISHED`, `REJECTED`, `ARCHIVED`]).
+- **Content Brief Pipeline**: Stored under `ContentItem.metadataJson.contentBrief` (`objective`, `targetAudience`, `contentAngle`, `hook`, `cta`, `tone`, `outline`, `keyPoints`, `competitorReferences`).
+- **SEO Metadata & Keyword Linkage**: Stored under `ContentItem.metadataJson.seo` (`primaryKeyword`, `secondaryKeywords`, `searchIntent` [`INFORMATIONAL`, `COMMERCIAL`, `TRANSACTIONAL`, `NAVIGATIONAL`], `seoTitle`, `metaDescription`, `slug`, `targetRank`, `keywordId`, `internalLinks`).
+
+### B. Core REST Endpoints & Pipeline Actions
+- `POST /api/v1/content`: Creates content item with optional Idea, Brief, and SEO metadata.
+- `PATCH /api/v1/content/:id`: Partial update merging metadata without overwriting unrelated fields.
+- `POST /api/v1/content/:id/brief`: Saves content brief and advances editorial status to `BRIEF_READY`.
+- `POST /api/v1/content/:id/seo`: Attaches SEO metadata with strict `searchIntent` and cross-tenant `keywordId` verification.
+- `POST /api/v1/content/:id/submit-review`: Transitions status to `PENDING_APPROVAL` (In Review) and editorial status to `READY_FOR_REVIEW`.
+- `POST /api/v1/content/:id/approve`: Idempotent approval transitioning to `APPROVED` (records `approvedBy`).
+- `POST /api/v1/content/:id/reject`: Requires descriptive rejection reason, transitions to `REJECTED`.
+- `POST /api/v1/content/:id/archive`: Soft-deletes and archives content record.
+- `GET /api/v1/content`: Filter by `clientId`, `platform`, `format`, `status`, `editorialStatus`, `searchIntent`, `primaryKeyword`, and `search`.
+
+### C. Security, RBAC & Secret Protection
+- **Multi-Tenant Scoping**: All operations enforce `req.agencyId` and verify client/campaign/social/keyword tenant boundaries.
+- **RBAC**: Operational roles (`OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`) can create and manage content; Approval/Rejection is strictly restricted to `OWNER`, `ADMIN`, `MANAGER` (`OPERATOR`, `VIEWER`, `ANALYST` blocked with `403 Forbidden`).
+- **Secret Sanitization**: Zero API keys or OAuth access tokens in responses, audit logs, or serialized state.
+- **Publishing Integration**: Seamless handoff from `APPROVED` content items into `publishingQueue` with `CONFIGURATION_REQUIRED` safety gates.
+
+
 
 
 

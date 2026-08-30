@@ -18,9 +18,13 @@ contentRoutes.get('/calendar', contentController.getCalendar);
 contentRoutes.get('/:id', contentController.getContentById);
 contentRoutes.post('/', contentController.createContent);
 contentRoutes.patch('/:id', contentController.updateContent);
+contentRoutes.post('/:id/brief', contentController.saveBrief);
+contentRoutes.post('/:id/seo', contentController.saveSeoMetadata);
+contentRoutes.post('/:id/submit-review', contentController.submitReview);
 contentRoutes.post('/:id/schedule', contentController.scheduleContent);
 contentRoutes.post('/:id/approve', contentController.approveContent);
 contentRoutes.post('/:id/reject', contentController.rejectContent);
+contentRoutes.post('/:id/archive', contentController.archiveContent);
 contentRoutes.delete('/:id', contentController.deleteContent);
 
 export default contentRoutes;

@@ -315,9 +315,13 @@ class ApiClient {
       get: (id) => this.get(`/api/v1/content/${id}`),
       create: (data) => this.post('/api/v1/content', data),
       update: (id, data) => this.patch(`/api/v1/content/${id}`, data),
+      saveBrief: (id, data) => this.post(`/api/v1/content/${id}/brief`, data),
+      saveSeo: (id, data) => this.post(`/api/v1/content/${id}/seo`, data),
+      submitReview: (id) => this.post(`/api/v1/content/${id}/submit-review`),
       schedule: (id, data) => this.post(`/api/v1/content/${id}/schedule`, data),
       approve: (id) => this.post(`/api/v1/content/${id}/approve`),
       reject: (id, data) => this.post(`/api/v1/content/${id}/reject`, data),
+      archive: (id) => this.post(`/api/v1/content/${id}/archive`),
       delete: (id) => this.delete(`/api/v1/content/${id}`),
     };
   }

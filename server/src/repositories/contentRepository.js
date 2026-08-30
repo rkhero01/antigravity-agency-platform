@@ -7,6 +7,7 @@ import { BaseRepository } from './baseRepository.js';
 import { clientRepository } from './clientRepository.js';
 import { socialAccountRepository } from './socialAccountRepository.js';
 import { campaignRepository } from './campaignRepository.js';
+import { seoKeywordRepository } from './seoKeywordRepository.js';
 import { NotFoundError, ValidationError, AuthorizationError } from '../utils/errors.js';
 
 export const ALLOWED_STATUSES = [
@@ -37,6 +38,169 @@ export const ALLOWED_FORMATS = [
   'ARTICLE',
   'STORY',
 ];
+
+export const CONTENT_IDEA_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+export const CONTENT_IDEA_STATUSES = [
+  'IDEA',
+  'RESEARCHING',
+  'BRIEF_READY',
+  'IN_PRODUCTION',
+  'READY_FOR_REVIEW',
+  'APPROVED',
+  'SCHEDULED',
+  'PUBLISHED',
+  'REJECTED',
+  'ARCHIVED',
+];
+
+export const SEO_SEARCH_INTENTS = [
+  'INFORMATIONAL',
+  'COMMERCIAL',
+  'TRANSACTIONAL',
+  'NAVIGATIONAL',
+];
+
+/**
+ * Validates and merges metadataJson safely
+ */
+export function normalizeAndValidateMetadata(rawMetadata = {}, incoming = {}) {
+  let existing = {};
+  if (typeof rawMetadata === 'string') {
+    try {
+      existing = JSON.parse(rawMetadata) || {};
+    } catch {
+      existing = {};
+    }
+  } else if (rawMetadata && typeof rawMetadata === 'object') {
+    existing = { ...rawMetadata };
+  }
+
+  const merged = { ...existing };
+
+  if (incoming.contentIdea !== undefined) {
+    if (incoming.contentIdea === null) {
+      delete merged.contentIdea;
+    } else if (typeof incoming.contentIdea !== 'object' || Array.isArray(incoming.contentIdea)) {
+      throw new ValidationError('contentIdea must be a valid object.');
+    } else {
+      const idea = incoming.contentIdea;
+      const prevIdea = merged.contentIdea || {};
+
+      let priority = (idea.priority || prevIdea.priority || 'MEDIUM').toUpperCase();
+      if (!CONTENT_IDEA_PRIORITIES.includes(priority)) {
+        throw new ValidationError(
+          `Invalid idea priority "${idea.priority}". Supported: ${CONTENT_IDEA_PRIORITIES.join(', ')}`
+        );
+      }
+
+      let status = (idea.status || prevIdea.status || 'IDEA').toUpperCase();
+      if (!CONTENT_IDEA_STATUSES.includes(status)) {
+        throw new ValidationError(
+          `Invalid idea status "${idea.status}". Supported: ${CONTENT_IDEA_STATUSES.join(', ')}`
+        );
+      }
+
+      if (prevIdea.status && prevIdea.status !== status) {
+        validateEditorialLifecycleTransition(prevIdea.status, status);
+      }
+
+      merged.contentIdea = {
+        ...prevIdea,
+        topic: idea.topic !== undefined ? String(idea.topic).trim() : (prevIdea.topic || ''),
+        angle: idea.angle !== undefined ? String(idea.angle).trim() : (prevIdea.angle || ''),
+        targetAudience: idea.targetAudience !== undefined ? String(idea.targetAudience).trim() : (prevIdea.targetAudience || ''),
+        objective: idea.objective !== undefined ? String(idea.objective).trim() : (prevIdea.objective || ''),
+        priority,
+        status,
+      };
+    }
+  }
+
+  if (incoming.contentBrief !== undefined) {
+    if (incoming.contentBrief === null) {
+      delete merged.contentBrief;
+    } else if (typeof incoming.contentBrief !== 'object' || Array.isArray(incoming.contentBrief)) {
+      throw new ValidationError('contentBrief must be a valid object.');
+    } else {
+      const brief = incoming.contentBrief;
+      const prevBrief = merged.contentBrief || {};
+
+      merged.contentBrief = {
+        ...prevBrief,
+        objective: brief.objective !== undefined ? String(brief.objective).trim() : (prevBrief.objective || ''),
+        targetAudience: brief.targetAudience !== undefined ? String(brief.targetAudience).trim() : (prevBrief.targetAudience || ''),
+        contentAngle: brief.contentAngle !== undefined ? String(brief.contentAngle).trim() : (prevBrief.contentAngle || ''),
+        hook: brief.hook !== undefined ? String(brief.hook).trim() : (prevBrief.hook || ''),
+        cta: brief.cta !== undefined ? String(brief.cta).trim() : (prevBrief.cta || ''),
+        tone: brief.tone !== undefined ? String(brief.tone).trim() : (prevBrief.tone || ''),
+        outline: Array.isArray(brief.outline) ? brief.outline : (prevBrief.outline || []),
+        keyPoints: Array.isArray(brief.keyPoints) ? brief.keyPoints : (prevBrief.keyPoints || []),
+        competitorReferences: Array.isArray(brief.competitorReferences) ? brief.competitorReferences : (prevBrief.competitorReferences || []),
+      };
+    }
+  }
+
+  if (incoming.seo !== undefined) {
+    if (incoming.seo === null) {
+      delete merged.seo;
+    } else if (typeof incoming.seo !== 'object' || Array.isArray(incoming.seo)) {
+      throw new ValidationError('seo metadata must be a valid object.');
+    } else {
+      const seo = incoming.seo;
+      const prevSeo = merged.seo || {};
+
+      let searchIntent = (seo.searchIntent || prevSeo.searchIntent || 'INFORMATIONAL').toUpperCase();
+      if (!SEO_SEARCH_INTENTS.includes(searchIntent)) {
+        throw new ValidationError(
+          `Invalid search intent "${seo.searchIntent}". Supported: ${SEO_SEARCH_INTENTS.join(', ')}`
+        );
+      }
+
+      merged.seo = {
+        ...prevSeo,
+        primaryKeyword: seo.primaryKeyword !== undefined ? String(seo.primaryKeyword).trim() : (prevSeo.primaryKeyword || ''),
+        secondaryKeywords: Array.isArray(seo.secondaryKeywords) ? seo.secondaryKeywords : (prevSeo.secondaryKeywords || []),
+        searchIntent,
+        seoTitle: seo.seoTitle !== undefined ? String(seo.seoTitle).trim() : (prevSeo.seoTitle || ''),
+        metaDescription: seo.metaDescription !== undefined ? String(seo.metaDescription).trim() : (prevSeo.metaDescription || ''),
+        slug: seo.slug !== undefined ? String(seo.slug).trim() : (prevSeo.slug || ''),
+        targetRank: seo.targetRank !== undefined ? (seo.targetRank !== null ? Number(seo.targetRank) : null) : (prevSeo.targetRank !== undefined ? prevSeo.targetRank : null),
+        keywordId: seo.keywordId !== undefined ? (seo.keywordId || null) : (prevSeo.keywordId || null),
+        internalLinks: Array.isArray(seo.internalLinks) ? seo.internalLinks : (prevSeo.internalLinks || []),
+      };
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Validates editorial workflow transitions
+ */
+export function validateEditorialLifecycleTransition(currentStatus, targetStatus) {
+  if (!currentStatus || currentStatus === targetStatus) return;
+
+  const validTransitions = {
+    IDEA: ['RESEARCHING', 'BRIEF_READY', 'IN_PRODUCTION', 'READY_FOR_REVIEW', 'APPROVED', 'ARCHIVED'],
+    RESEARCHING: ['BRIEF_READY', 'IN_PRODUCTION', 'READY_FOR_REVIEW', 'APPROVED', 'ARCHIVED'],
+    BRIEF_READY: ['IN_PRODUCTION', 'READY_FOR_REVIEW', 'APPROVED', 'ARCHIVED'],
+    IN_PRODUCTION: ['READY_FOR_REVIEW', 'APPROVED', 'ARCHIVED'],
+    READY_FOR_REVIEW: ['APPROVED', 'REJECTED', 'IN_PRODUCTION', 'ARCHIVED'],
+    APPROVED: ['SCHEDULED', 'PUBLISHED', 'IN_PRODUCTION', 'REJECTED', 'ARCHIVED'],
+    SCHEDULED: ['PUBLISHED', 'IN_PRODUCTION', 'APPROVED', 'REJECTED', 'ARCHIVED'],
+    REJECTED: ['IN_PRODUCTION', 'READY_FOR_REVIEW', 'APPROVED', 'ARCHIVED'],
+    PUBLISHED: ['ARCHIVED'],
+    ARCHIVED: ['IDEA', 'DRAFT'],
+  };
+
+  const allowed = validTransitions[currentStatus] || [];
+  if (!allowed.includes(targetStatus)) {
+    throw new ValidationError(
+      `Invalid content lifecycle transition from "${currentStatus}" to "${targetStatus}". Allowed next stages: ${allowed.join(', ')}`
+    );
+  }
+}
 
 export class ContentRepository extends BaseRepository {
   constructor() {
@@ -132,6 +296,9 @@ export class ContentRepository extends BaseRepository {
       platform,
       format,
       status,
+      editorialStatus,
+      searchIntent,
+      primaryKeyword,
       search,
     } = filters;
 
@@ -165,13 +332,59 @@ export class ContentRepository extends BaseRepository {
       filtered = filtered.filter((p) => (p.status || '').toUpperCase() === sUpper);
     }
 
+    if (editorialStatus && editorialStatus !== 'all') {
+      const esUpper = editorialStatus.toUpperCase();
+      filtered = filtered.filter((p) => {
+        let meta = {};
+        try {
+          meta = p.metadataJson ? (typeof p.metadataJson === 'string' ? JSON.parse(p.metadataJson) : p.metadataJson) : {};
+        } catch {
+          meta = {};
+        }
+        return (meta.contentIdea?.status || '').toUpperCase() === esUpper;
+      });
+    }
+
+    if (searchIntent && searchIntent !== 'all') {
+      const siUpper = searchIntent.toUpperCase();
+      filtered = filtered.filter((p) => {
+        let meta = {};
+        try {
+          meta = p.metadataJson ? (typeof p.metadataJson === 'string' ? JSON.parse(p.metadataJson) : p.metadataJson) : {};
+        } catch {
+          meta = {};
+        }
+        return (meta.seo?.searchIntent || '').toUpperCase() === siUpper;
+      });
+    }
+
+    if (primaryKeyword && primaryKeyword.trim()) {
+      const kwQuery = primaryKeyword.trim().toLowerCase();
+      filtered = filtered.filter((p) => {
+        let meta = {};
+        try {
+          meta = p.metadataJson ? (typeof p.metadataJson === 'string' ? JSON.parse(p.metadataJson) : p.metadataJson) : {};
+        } catch {
+          meta = {};
+        }
+        return (meta.seo?.primaryKeyword || '').toLowerCase().includes(kwQuery);
+      });
+    }
+
     if (search && search.trim()) {
       const q = search.trim().toLowerCase();
       filtered = filtered.filter((p) => {
         const title = (p.title || '').toLowerCase();
         const caption = (p.caption || '').toLowerCase();
         const author = (p.author || '').toLowerCase();
-        return title.includes(q) || caption.includes(q) || author.includes(q);
+        let topic = '';
+        let kw = '';
+        try {
+          const meta = p.metadataJson ? (typeof p.metadataJson === 'string' ? JSON.parse(p.metadataJson) : p.metadataJson) : {};
+          topic = (meta.contentIdea?.topic || '').toLowerCase();
+          kw = (meta.seo?.primaryKeyword || '').toLowerCase();
+        } catch {}
+        return title.includes(q) || caption.includes(q) || author.includes(q) || topic.includes(q) || kw.includes(q);
       });
     }
 
@@ -186,12 +399,24 @@ export class ContentRepository extends BaseRepository {
     const socialMap = new Map(socialAccounts.map((sa) => [sa.id, sa.accountName]));
     const campaignMap = new Map(campaigns.map((camp) => [camp.id, camp.name]));
 
-    return filtered.map((item) => ({
-      ...item,
-      clientName: clientMap.get(item.clientId) || 'Assigned Client',
-      socialAccountName: item.socialAccountId ? socialMap.get(item.socialAccountId) || null : null,
-      campaignName: item.campaignId ? campaignMap.get(item.campaignId) || null : null,
-    }));
+    return filtered.map((item) => {
+      let meta = {};
+      try {
+        meta = item.metadataJson ? (typeof item.metadataJson === 'string' ? JSON.parse(item.metadataJson) : item.metadataJson) : {};
+      } catch {
+        meta = {};
+      }
+      return {
+        ...item,
+        metadata: meta,
+        contentIdea: meta.contentIdea || null,
+        contentBrief: meta.contentBrief || null,
+        seo: meta.seo || null,
+        clientName: clientMap.get(item.clientId) || 'Assigned Client',
+        socialAccountName: item.socialAccountId ? socialMap.get(item.socialAccountId) || null : null,
+        campaignName: item.campaignId ? campaignMap.get(item.campaignId) || null : null,
+      };
+    });
   }
 
   /**
@@ -216,6 +441,18 @@ export class ContentRepository extends BaseRepository {
         item.campaignName = camp?.name || null;
       }
     }
+
+    let meta = {};
+    try {
+      meta = item.metadataJson ? (typeof item.metadataJson === 'string' ? JSON.parse(item.metadataJson) : item.metadataJson) : {};
+    } catch {
+      meta = {};
+    }
+
+    item.metadata = meta;
+    item.contentIdea = meta.contentIdea || null;
+    item.contentBrief = meta.contentBrief || null;
+    item.seo = meta.seo || null;
 
     return item;
   }
@@ -256,6 +493,15 @@ export class ContentRepository extends BaseRepository {
       }
     }
 
+    // Verify SEO keyword if provided
+    const kwId = data.seo?.keywordId || data.metadataJson?.seo?.keywordId;
+    if (kwId) {
+      const kw = await seoKeywordRepository.findById(kwId, agencyId);
+      if (!kw) {
+        throw new NotFoundError(`SEO keyword "${kwId}" not found in this agency.`);
+      }
+    }
+
     const platform = data.platform && ALLOWED_PLATFORMS.includes(data.platform.toUpperCase())
       ? data.platform.toUpperCase()
       : 'INSTAGRAM';
@@ -269,6 +515,12 @@ export class ContentRepository extends BaseRepository {
       : (data.scheduledAt ? 'SCHEDULED' : 'DRAFT');
 
     const scheduledAt = data.scheduledAt ? new Date(data.scheduledAt) : null;
+
+    const mergedMeta = normalizeAndValidateMetadata(data.metadataJson || {}, {
+      contentIdea: data.contentIdea,
+      contentBrief: data.contentBrief,
+      seo: data.seo,
+    });
 
     const payload = {
       agencyId,
@@ -289,7 +541,7 @@ export class ContentRepository extends BaseRepository {
       likesCount: 0,
       commentsCount: 0,
       sharesCount: 0,
-      metadataJson: data.metadataJson ? JSON.stringify(data.metadataJson) : null,
+      metadataJson: Object.keys(mergedMeta).length > 0 ? JSON.stringify(mergedMeta) : null,
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
@@ -297,6 +549,10 @@ export class ContentRepository extends BaseRepository {
 
     const created = await super.create(payload, agencyId);
     created.clientName = client.clientName;
+    created.metadata = mergedMeta;
+    created.contentIdea = mergedMeta.contentIdea || null;
+    created.contentBrief = mergedMeta.contentBrief || null;
+    created.seo = mergedMeta.seo || null;
     return created;
   }
 
@@ -361,6 +617,10 @@ export class ContentRepository extends BaseRepository {
       }
     }
 
+    if (updates.deletedAt !== undefined) {
+      safeUpdates.deletedAt = updates.deletedAt ? new Date(updates.deletedAt) : null;
+    }
+
     if (updates.approvedBy !== undefined) {
       safeUpdates.approvedBy = updates.approvedBy;
     }
@@ -389,7 +649,52 @@ export class ContentRepository extends BaseRepository {
       }
     }
 
-    return await super.update(id, safeUpdates, agencyId);
+    // Verify SEO keyword if updated
+    if (updates.seo?.keywordId) {
+      const kw = await seoKeywordRepository.findById(updates.seo.keywordId, agencyId);
+      if (!kw) {
+        throw new NotFoundError(`SEO keyword "${updates.seo.keywordId}" not found in this agency.`);
+      }
+    }
+
+    // Merge metadata safely
+    if (
+      updates.contentIdea !== undefined ||
+      updates.contentBrief !== undefined ||
+      updates.seo !== undefined ||
+      updates.metadataJson !== undefined
+    ) {
+      const rawIncomingMeta = typeof updates.metadataJson === 'object' && updates.metadataJson !== null
+        ? updates.metadataJson
+        : {};
+
+      const mergedMeta = normalizeAndValidateMetadata(existing.metadataJson || {}, {
+        contentIdea: updates.contentIdea,
+        contentBrief: updates.contentBrief,
+        seo: updates.seo,
+        ...rawIncomingMeta,
+      });
+
+      safeUpdates.metadataJson = JSON.stringify(mergedMeta);
+    }
+
+    const result = await super.update(id, safeUpdates, agencyId);
+    if (result) {
+      let meta = {};
+      try {
+        meta = result.metadataJson ? (typeof result.metadataJson === 'string' ? JSON.parse(result.metadataJson) : result.metadataJson) : {};
+      } catch {
+        meta = {};
+      }
+      result.metadata = meta;
+      result.contentIdea = meta.contentIdea || null;
+      result.contentBrief = meta.contentBrief || null;
+      result.seo = meta.seo || null;
+      if (existing.clientName) result.clientName = existing.clientName;
+      if (existing.socialAccountName) result.socialAccountName = existing.socialAccountName;
+      if (existing.campaignName) result.campaignName = existing.campaignName;
+    }
+    return result;
   }
 
   /**
