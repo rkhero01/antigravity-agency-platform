@@ -138,10 +138,16 @@ class ApiClient {
       }
 
       let payload = {};
-      try {
-        payload = await response.json();
-      } catch (e) {
-        payload = { raw: await response.text().catch(() => '') };
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          payload = await response.json();
+        } catch (e) {
+          payload = {};
+        }
+      } else {
+        const text = await response.text().catch(() => '');
+        payload = { data: text, text };
       }
 
       // Handle HTTP Error Codes
@@ -327,6 +333,18 @@ class ApiClient {
       publishNow: (id) => this.post(`/api/v1/publishing/jobs/${id}/publish-now`),
       retry: (id) => this.post(`/api/v1/publishing/jobs/${id}/retry`),
       cancel: (id) => this.post(`/api/v1/publishing/jobs/${id}/cancel`),
+    };
+  }
+
+  // 8.6 Analytics, Performance & Reporting
+  get analytics() {
+    return {
+      getOverview: (params) => this.get('/api/v1/analytics/overview', { params }),
+      getCampaigns: (params) => this.get('/api/v1/analytics/campaigns', { params }),
+      getLeads: (params) => this.get('/api/v1/analytics/leads', { params }),
+      getContent: (params) => this.get('/api/v1/analytics/content', { params }),
+      getClients: (params) => this.get('/api/v1/analytics/clients', { params }),
+      exportCsv: (params) => this.get('/api/v1/analytics/export', { params: { ...params, format: 'csv' } }),
     };
   }
 

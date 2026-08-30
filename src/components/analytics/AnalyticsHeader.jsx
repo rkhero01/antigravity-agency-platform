@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
   FileText,
@@ -7,7 +7,7 @@ import {
   Building,
   Share2,
 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
+import { clientsService } from '../../services/clientsService.js';
 
 export function AnalyticsHeader({
   dateRange,
@@ -20,6 +20,21 @@ export function AnalyticsHeader({
   onOpenScheduleModal,
   onExportCsv,
 }) {
+  const [clients, setClients] = useState([]);
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const list = await clientsService.getClients();
+      setClients(list);
+    } catch (e) {
+      console.error('Failed to load clients in analytics header:', e);
+    }
+  };
+
   const networks = ['all', 'Instagram', 'LinkedIn', 'Facebook', 'YouTube', 'Google Business'];
 
   return (
@@ -60,77 +75,83 @@ export function AnalyticsHeader({
 
           <button
             type="button"
-            className="btn-generate-report-primary"
+            className="btn-saas-primary"
             onClick={onOpenReportModal}
           >
-            <FileText size={16} />
-            <span>Generate Executive PDF</span>
+            <FileText size={15} />
+            <span>Generate Client Report</span>
           </button>
         </div>
       </div>
 
-      {/* Filter and Control Toolbar */}
-      <div className="analytics-toolbar-card">
-        <div className="toolbar-controls-row">
+      {/* Filter Row: Date Range, Client Filter, Social Platform */}
+      <div className="analytics-filter-bar">
+        {/* Date Range Selector */}
+        <div className="analytics-date-range-pills" role="group" aria-label="Date Range">
+          <button
+            type="button"
+            className={`date-pill ${dateRange === '7d' || dateRange === 'last_7_days' ? 'active' : ''}`}
+            onClick={() => onDateRangeChange('last_7_days')}
+          >
+            Last 7 Days
+          </button>
+          <button
+            type="button"
+            className={`date-pill ${dateRange === '30d' || dateRange === 'last_30_days' ? 'active' : ''}`}
+            onClick={() => onDateRangeChange('last_30_days')}
+          >
+            Last 30 Days
+          </button>
+          <button
+            type="button"
+            className={`date-pill ${dateRange === '90d' || dateRange === 'this_month' ? 'active' : ''}`}
+            onClick={() => onDateRangeChange('this_month')}
+          >
+            This Month
+          </button>
+          <button
+            type="button"
+            className={`date-pill ${dateRange === 'previous_month' ? 'active' : ''}`}
+            onClick={() => onDateRangeChange('previous_month')}
+          >
+            Previous Month
+          </button>
+        </div>
+
+        <div className="analytics-dropdown-filters">
           {/* Client Filter */}
-          <div className="analytics-select-wrapper">
-            <Building size={14} className="icon-muted" />
+          <div className="filter-select-wrapper">
+            <Building size={14} className="filter-icon" />
             <select
               value={selectedClient}
               onChange={(e) => onClientChange(e.target.value)}
-              className="analytics-select-field"
-              aria-label="Filter by Client Account"
+              className="analytics-select"
+              aria-label="Filter by Client Workspace"
             >
-              <option value="all">🏢 All Client Accounts</option>
-              {mockClients.map((c) => (
+              <option value="all">All Client Workspaces</option>
+              {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.name || c.clientName}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Network Filter */}
-          <div className="analytics-select-wrapper">
-            <Share2 size={14} className="icon-muted" />
+          {/* Social Network Filter */}
+          <div className="filter-select-wrapper">
+            <Share2 size={14} className="filter-icon" />
             <select
               value={selectedNetwork}
               onChange={(e) => onNetworkChange(e.target.value)}
-              className="analytics-select-field"
-              aria-label="Filter by Channel"
+              className="analytics-select"
+              aria-label="Filter by Network"
             >
-              <option value="all">🌐 All Channels</option>
-              {networks.filter((n) => n !== 'all').map((net) => (
-                <option key={net} value={net}>
-                  {net}
+              {networks.map((n) => (
+                <option key={n} value={n}>
+                  {n === 'all' ? 'All Networks' : n}
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Date Range Selector */}
-          <div className="analytics-date-range-pills" role="group" aria-label="Date Range">
-            <button
-              type="button"
-              className={`range-pill-btn ${dateRange === '7d' ? 'active' : ''}`}
-              onClick={() => onDateRangeChange('7d')}
-            >
-              7D
-            </button>
-            <button
-              type="button"
-              className={`range-pill-btn ${dateRange === '30d' ? 'active' : ''}`}
-              onClick={() => onDateRangeChange('30d')}
-            >
-              30D
-            </button>
-            <button
-              type="button"
-              className={`range-pill-btn ${dateRange === '90d' ? 'active' : ''}`}
-              onClick={() => onDateRangeChange('90d')}
-            >
-              90D
-            </button>
           </div>
         </div>
       </div>
