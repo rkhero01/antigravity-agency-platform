@@ -13,11 +13,12 @@ import {
   MessageSquare,
   Share,
   Edit2,
-  Check,
-  XCircle,
+  Send,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { CONTENT_STATUSES } from '../../services/contentService.js';
+import { publishingService } from '../../services/publishingService.js';
 
 export function PostDetailModal({
   post,
@@ -27,6 +28,7 @@ export function PostDetailModal({
   onDeletePost,
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   if (!isOpen || !post) return null;
@@ -55,6 +57,51 @@ export function PostDetailModal({
       setFeedback({ type: 'success', text: `Post status updated to ${newStatus}` });
     } catch (err) {
       setFeedback({ type: 'error', text: err.message || 'Failed to update post status.' });
+    }
+  };
+
+  const handlePublishNow = async () => {
+    if (!post.socialAccountId) {
+      setFeedback({
+        type: 'error',
+        text: 'No linked social channel account assigned to this post. Please edit the post to attach an authorized channel.',
+      });
+      return;
+    }
+
+    setIsPublishing(true);
+    setFeedback(null);
+    try {
+      // 1. Queue job
+      const job = await publishingService.queuePublish({
+        contentItemId: post.id,
+        socialAccountId: post.socialAccountId,
+        platform: post.platformRaw || post.platform,
+      });
+
+      // 2. Dispatch job
+      const dispatchRes = await publishingService.publishNow(job.id);
+      if (dispatchRes.result?.status === 'CONFIGURATION_REQUIRED') {
+        setFeedback({
+          type: 'warning',
+          text: `[OAuth Gated]: ${dispatchRes.result.error}`,
+        });
+      } else if (dispatchRes.result?.success) {
+        setFeedback({
+          type: 'success',
+          text: `Successfully published to ${post.platform}! External ID: ${dispatchRes.result.externalPostId}`,
+        });
+        await onUpdateStatus(post.id, 'Published');
+      } else {
+        setFeedback({
+          type: 'error',
+          text: dispatchRes.result?.error || 'Publishing attempt failed.',
+        });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', text: err.message || 'Publishing failed.' });
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -98,10 +145,10 @@ export function PostDetailModal({
         {/* Feedback Banner */}
         {feedback && (
           <div
-            className={`modal-${feedback.type === 'error' ? 'error' : 'success'}-banner`}
+            className={`modal-${feedback.type === 'error' ? 'error' : feedback.type === 'warning' ? 'error' : 'success'}-banner`}
             role="status"
           >
-            {feedback.type === 'error' ? (
+            {feedback.type === 'error' || feedback.type === 'warning' ? (
               <AlertCircle size={16} className="error-banner-icon" />
             ) : (
               <CheckCircle2 size={16} className="success-banner-icon" />
@@ -203,20 +250,32 @@ export function PostDetailModal({
               type="button"
               className="btn-delete-member"
               onClick={handleDelete}
-              disabled={isDeleting}
+              disabled={isDeleting || isPublishing}
               title="Archive Post"
             >
               <Trash2 size={15} />
               <span>{isDeleting ? 'Archiving...' : 'Archive Post'}</span>
             </button>
 
-            <button
-              type="button"
-              className="btn-saas-secondary"
-              onClick={onClose}
-            >
-              Close
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-saas-secondary"
+                onClick={onClose}
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                className="btn-saas-primary"
+                onClick={handlePublishNow}
+                disabled={isPublishing}
+              >
+                <Send size={14} className={isPublishing ? 'animate-spin' : ''} />
+                <span>{isPublishing ? 'Dispatching...' : 'Publish to Channel Now'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

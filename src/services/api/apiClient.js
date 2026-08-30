@@ -316,6 +316,20 @@ class ApiClient {
     };
   }
 
+  // 8.5 Social Publishing & Queue Dispatch
+  get publishing() {
+    return {
+      list: (params) => this.get('/api/v1/publishing', { params }),
+      queue: (data) => this.post('/api/v1/publishing/queue', data),
+      getQueue: () => this.get('/api/v1/publishing/queue'),
+      getFailed: () => this.get('/api/v1/publishing/failed'),
+      get: (id) => this.get(`/api/v1/publishing/jobs/${id}`),
+      publishNow: (id) => this.post(`/api/v1/publishing/jobs/${id}/publish-now`),
+      retry: (id) => this.post(`/api/v1/publishing/jobs/${id}/retry`),
+      cancel: (id) => this.post(`/api/v1/publishing/jobs/${id}/cancel`),
+    };
+  }
+
   // 8. WhatsApp Marketing, Inbox & Automations
   get whatsapp() {
     return {

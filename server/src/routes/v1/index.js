@@ -20,6 +20,7 @@ import { actionRoutes } from './actionRoutes.js';
 import { webhookRoutes } from './webhookRoutes.js';
 import { socialAccountRoutes } from './socialAccountRoutes.js';
 import { contentRoutes } from './contentRoutes.js';
+import { publishingRoutes } from './publishingRoutes.js';
 
 export const v1Router = Router();
 
@@ -40,5 +41,6 @@ v1Router.use('/actions', actionRoutes);
 v1Router.use('/webhooks', webhookRoutes);
 v1Router.use('/social-accounts', socialAccountRoutes);
 v1Router.use('/content', contentRoutes);
+v1Router.use('/publishing', publishingRoutes);
 
 export default v1Router;
