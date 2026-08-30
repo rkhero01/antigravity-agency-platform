@@ -12,6 +12,7 @@ import { leadRepository } from '../../../repositories/leadRepository.js';
 import { campaignRepository } from '../../../repositories/campaignRepository.js';
 import { integrationService } from '../../integrations/integrationService.js';
 import { auditService } from '../../auditService.js';
+import { automationDispatcher } from '../../automationDispatcher.js';
 import { ValidationError, NotFoundError, AuthorizationError } from '../../../utils/errors.js';
 
 export class MetaWebhookProvider extends BaseWebhookProvider {
@@ -377,6 +378,22 @@ export class MetaWebhookProvider extends BaseWebhookProvider {
             source: 'META_ADS',
           },
         });
+
+        // Trigger tenant-scoped automation workflows
+        try {
+          await automationDispatcher.dispatchLeadCreated({
+            eventType: 'LEAD_CREATED',
+            eventId: normalizedEvent.eventId,
+            leadId: newLead.id,
+            agencyId,
+            clientId: clientId || 'c1',
+            campaignId: resolvedCampaignId,
+            source: 'META_ADS',
+            createdAt: new Date().toISOString(),
+          });
+        } catch (autoErr) {
+          console.warn('[AUTOMATION_DISPATCH_NOTICE] Workflow dispatch notice:', autoErr.message);
+        }
 
         return {
           success: true,

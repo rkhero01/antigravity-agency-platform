@@ -163,3 +163,38 @@ flowchart TD
 4. **Zero Secret Exposure**: Tokens and secrets are never emitted in logs or response payloads. Audit logs record entity IDs and timestamps only.
 5. **No Fabricated Leads**: If external Meta credentials or Page tokens are unconfigured or expired, the pipeline returns `CONFIGURATION_REQUIRED` or `REAUTH_REQUIRED` rather than creating synthetic data.
 
+---
+
+## 7. Real-Time Lead Automation Workflows & Execution Engine
+
+### A. Workflow Architecture
+```mermaid
+flowchart TD
+    LeadCreated["Lead Created Event (PostgreSQL)"] -->|1. Safe Event Payload| Dispatcher["Automation Dispatcher"]
+    Dispatcher -->|2. Query Active Tenant Rules| AutomationRepo["AutomationRule (agencyId Scoped)"]
+    AutomationRepo -->|3. Deterministic Matching| RuleFilter["Rule Matcher (Client, Source, Campaign)"]
+    RuleFilter -->|4. Check Idempotency| ExecRepo["AutomationExecution (agencyId + eventId + ruleId)"]
+    ExecRepo -->|5a. Duplicate Event| Skip["Skip Duplicate Execution (DUPLICATE)"]
+    ExecRepo -->|5b. First Execution| ExecEngine["Action Execution Engine"]
+    ExecEngine -->|6a. Internal Action| LeadUpdate["Update Stage / Assign Owner / Create Task"]
+    ExecEngine -->|6b. Unconfigured External Provider| ConfigGate["Return CONFIGURATION_REQUIRED (No Fake Dispatch)"]
+    ExecEngine -->|7. Record History| ExecHistory["Persist Execution Log (SUCCESS / FAILED)"]
+    ExecEngine -->|8. Audit Trail| Audit["auditService.log(AUTOMATION_TRIGGERED)"]
+```
+
+### B. Supported Triggers & Actions
+- **Triggers**:
+  - `LEAD_CREATED`: Dispatched immediately when a new lead is persisted from a verified Meta Lead Ads webhook, CRM API, or direct intake.
+- **Actions**:
+  - `CREATE_CRM_TASK`: Schedules a follow-up action for sales specialists.
+  - `UPDATE_LEAD_STAGE`: Advances lead pipeline stage (`NEW` -> `CONTACTED` -> `QUALIFIED`).
+  - `ASSIGN_LEAD_OWNER`: Designates lead owner.
+  - `LOG_AUDIT_EVENT`: Creates a cryptographically safe audit record.
+  - `SEND_WHATSAPP` / `DISPATCH_NOTIFICATION`: Requires active Meta WhatsApp Business API credentials; safely returns `CONFIGURATION_REQUIRED` if unconfigured.
+
+### C. Idempotency & Safety Guarantees
+- **Persistent Key**: `agencyId:eventId:automationId` ensures no automation is triggered more than once for the same event delivery.
+- **RBAC**: Operational roles (`OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`) can configure rules; `VIEWER` and `ANALYST` have read-only access.
+- **Zero Token Leakage**: Execution history records only task parameters, status, timestamps, and error summaries with all secrets sanitized.
+
+
