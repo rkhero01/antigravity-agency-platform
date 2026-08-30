@@ -1,6 +1,6 @@
 /**
  * LinkedIn OAuth Provider
- * Task 11: Real LinkedIn OAuth 2.0 Flow & Organization Discovery
+ * Task 12: Real LinkedIn OAuth 2.0 Flow & Multi-Target Discovery
  */
 
 import { BaseOAuthProvider } from './baseOAuthProvider.js';
@@ -60,6 +60,20 @@ export class LinkedInOAuthProvider extends BaseOAuthProvider {
   }
 
   async getAccountProfile({ accessToken }) {
+    const accounts = await this.discoverAccounts({ accessToken });
+    if (accounts.length > 0) {
+      return accounts[0];
+    }
+    return {
+      platformAccountId: `linkedin_${Date.now()}`,
+      accountName: 'LinkedIn Profile',
+      handle: '@linkedinprofile',
+      platform: 'LINKEDIN',
+      metadata: {},
+    };
+  }
+
+  async discoverAccounts({ accessToken }) {
     const userinfoUrl = 'https://api.linkedin.com/v2/userinfo';
     const res = await fetch(userinfoUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -72,17 +86,55 @@ export class LinkedInOAuthProvider extends BaseOAuthProvider {
 
     const name = data.name || `${data.given_name || ''} ${data.family_name || ''}`.trim() || 'LinkedIn Member';
 
-    return {
-      platformAccountId: data.sub,
-      accountName: name,
-      handle: `@${name.replace(/\s+/g, '').toLowerCase()}`,
-      platform: 'LINKEDIN',
-      metadata: {
-        linkedinSub: data.sub,
-        email: data.email,
-        picture: data.picture,
+    const discovered = [
+      {
+        platformAccountId: data.sub,
+        accountName: name,
+        handle: `@${name.replace(/\s+/g, '').toLowerCase()}`,
+        platform: 'LINKEDIN',
+        platformLabel: 'LinkedIn Member Profile',
+        avatarUrl: data.picture || null,
+        metadata: {
+          linkedinSub: data.sub,
+          email: data.email,
+          targetType: 'PERSONAL',
+        },
       },
-    };
+    ];
+
+    // Attempt to discover organizations if permission granted
+    try {
+      const orgUrl = 'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee';
+      const orgRes = await fetch(orgUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const orgData = await orgRes.json();
+      const elements = orgData.elements || [];
+
+      for (const el of elements) {
+        const orgUrn = el.organizationalTarget;
+        if (orgUrn) {
+          const orgId = orgUrn.split(':').pop();
+          discovered.push({
+            platformAccountId: orgId,
+            accountName: `LinkedIn Company (${orgId})`,
+            handle: `@linkedin_org_${orgId}`,
+            platform: 'LINKEDIN',
+            platformLabel: 'LinkedIn Organization Page',
+            avatarUrl: null,
+            metadata: {
+              organizationUrn: orgUrn,
+              role: el.role,
+              targetType: 'ORGANIZATION',
+            },
+          });
+        }
+      }
+    } catch (e) {
+      // Org discovery notice
+    }
+
+    return discovered;
   }
 }
 

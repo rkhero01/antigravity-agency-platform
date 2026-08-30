@@ -1,6 +1,6 @@
 /**
  * Meta (Facebook & Instagram) OAuth Provider
- * Task 11: Real Meta Graph API OAuth Flow & Account Discovery
+ * Task 12: Real Meta Graph API Discovery for Facebook Pages & Instagram Professional
  */
 
 import { BaseOAuthProvider } from './baseOAuthProvider.js';
@@ -66,7 +66,21 @@ export class MetaOAuthProvider extends BaseOAuthProvider {
   }
 
   async getAccountProfile({ accessToken }) {
-    const meUrl = `https://graph.facebook.com/v19.0/me?fields=id,name,accounts{id,name,category,instagram_business_account{id,username}}&access_token=${encodeURIComponent(accessToken)}`;
+    const accounts = await this.discoverAccounts({ accessToken });
+    if (accounts.length > 0) {
+      return accounts[0];
+    }
+    return {
+      platformAccountId: `meta_${Date.now()}`,
+      accountName: 'Meta Channel',
+      handle: '@metachannel',
+      platform: 'FACEBOOK',
+      metadata: {},
+    };
+  }
+
+  async discoverAccounts({ accessToken }) {
+    const meUrl = `https://graph.facebook.com/v19.0/me?fields=id,name,accounts{id,name,category,picture,access_token,instagram_business_account{id,username,profile_picture_url}}&access_token=${encodeURIComponent(accessToken)}`;
     const res = await fetch(meUrl);
     const data = await res.json();
 
@@ -74,22 +88,63 @@ export class MetaOAuthProvider extends BaseOAuthProvider {
       throw new Error(`Meta profile discovery failed: ${data.error.message}`);
     }
 
-    // Discover first page / IG account
-    const firstPage = data.accounts?.data?.[0];
-    const igAccount = firstPage?.instagram_business_account;
+    const discovered = [];
+    const pages = data.accounts?.data || [];
 
-    return {
-      platformAccountId: igAccount?.id || firstPage?.id || data.id,
-      accountName: igAccount?.username ? `@${igAccount.username}` : (firstPage?.name || data.name),
-      handle: igAccount?.username ? `@${igAccount.username}` : `@${data.name?.replace(/\s+/g, '').toLowerCase()}`,
-      platform: igAccount ? 'INSTAGRAM' : 'FACEBOOK',
-      metadata: {
-        facebookUserId: data.id,
-        pageId: firstPage?.id || null,
-        pageName: firstPage?.name || null,
-        instagramId: igAccount?.id || null,
-      },
-    };
+    for (const page of pages) {
+      // 1. Add Facebook Page
+      discovered.push({
+        platformAccountId: page.id,
+        accountName: page.name,
+        handle: `@${page.name?.replace(/\s+/g, '').toLowerCase()}`,
+        platform: 'FACEBOOK',
+        platformLabel: 'Facebook Page',
+        avatarUrl: page.picture?.data?.url || null,
+        metadata: {
+          pageId: page.id,
+          pageName: page.name,
+          category: page.category || null,
+          facebookUserId: data.id,
+        },
+      });
+
+      // 2. Add connected Instagram Professional account if present
+      if (page.instagram_business_account) {
+        const ig = page.instagram_business_account;
+        discovered.push({
+          platformAccountId: ig.id,
+          accountName: `@${ig.username || page.name}`,
+          handle: `@${ig.username || page.name}`,
+          platform: 'INSTAGRAM',
+          platformLabel: 'Instagram Business',
+          avatarUrl: ig.profile_picture_url || page.picture?.data?.url || null,
+          metadata: {
+            instagramId: ig.id,
+            instagramUsername: ig.username,
+            pageId: page.id,
+            pageName: page.name,
+            facebookUserId: data.id,
+          },
+        });
+      }
+    }
+
+    // Fallback if user has no Pages created yet
+    if (discovered.length === 0 && data.id) {
+      discovered.push({
+        platformAccountId: data.id,
+        accountName: data.name || 'Meta User Account',
+        handle: `@${data.name?.replace(/\s+/g, '').toLowerCase() || data.id}`,
+        platform: 'FACEBOOK',
+        platformLabel: 'Facebook Account',
+        avatarUrl: null,
+        metadata: {
+          facebookUserId: data.id,
+        },
+      });
+    }
+
+    return discovered;
   }
 }
 

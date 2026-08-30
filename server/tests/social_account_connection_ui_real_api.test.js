@@ -1,12 +1,13 @@
 /**
  * Social Account Connection UI & Real OAuth Handshake Test Suite
- * Task 12: Complete Verification of Connection Center, Real OAuth Handshake, CSRF State, & Token Lifecycle
+ * Task 12: Complete Verification of Connection Center, Real OAuth Handshake, CSRF State, Multi-Page Discovery & Selection
  */
 
 import http from 'http';
 import { createApp } from '../src/app.js';
 import { integrationService } from '../src/services/integrations/integrationService.js';
 import { oauthStateStore } from '../src/services/integrations/oauth/oauthStateStore.js';
+import { oauthDiscoveryStore } from '../src/services/integrations/oauth/oauthDiscoveryStore.js';
 import { encryptToken, decryptToken, sanitizeAccountCredentials } from '../src/utils/tokenEncryption.js';
 import { clientsService } from '../../src/services/clientsService.js';
 import { socialAccountsService } from '../../src/services/socialAccountsService.js';
@@ -80,7 +81,7 @@ async function runSocialConnectionTests() {
     for (const plat of platforms) {
       const connRes = await apiClient.integrations.connect(plat, { clientId: targetClient.id });
       assert(
-        `Connect handshake initiated for ${plat.toUpperCase()}`,
+        `Connect handshake evaluated for ${plat.toUpperCase()}`,
         connRes.data?.status === 'CONFIGURATION_REQUIRED' || connRes.data?.status === 'CONNECTABLE'
       );
     }
@@ -127,8 +128,57 @@ async function runSocialConnectionTests() {
     }
     assert('Single-use state strictly enforced', replayCaught);
 
-    // Section 6: AES-256-GCM Token Encryption & Decryption
-    console.log('\n[SECTION 6] AES-256-GCM Token Encryption & Decryption');
+    // Section 6: OAuth Discovery Session Store & Account Selection
+    console.log('\n[SECTION 6] OAuth Discovery Session Store & Selection API');
+    const testDiscoveredAccounts = [
+      {
+        platformAccountId: `fb_page_${Date.now()}`,
+        accountName: 'Acme Marketing Page',
+        handle: '@acmemarketing',
+        platform: 'FACEBOOK',
+        platformLabel: 'Facebook Page',
+        avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61',
+        metadata: { pageId: '123456' },
+      },
+      {
+        platformAccountId: `ig_biz_${Date.now()}`,
+        accountName: '@acme.growth',
+        handle: '@acme.growth',
+        platform: 'INSTAGRAM',
+        platformLabel: 'Instagram Business',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+        metadata: { instagramId: '789012' },
+      },
+    ];
+
+    const discoveryToken = oauthDiscoveryStore.createSession({
+      agencyId: 'agency-demo-001',
+      clientId: targetClient.id,
+      userId: 'user-001',
+      provider: 'META',
+      tokenResult: {
+        accessToken: 'mock_meta_oauth_access_token_12345',
+        refreshToken: null,
+        tokenExpiresAt: new Date(Date.now() + 5184000000),
+        scopes: 'pages_show_list,pages_read_engagement,pages_manage_posts',
+      },
+      discoveredAccounts: testDiscoveredAccounts,
+    });
+    assert('Discovery session created with 64-char token', Boolean(discoveryToken && discoveryToken.length === 64));
+
+    // Connect selected account via select-account endpoint
+    const selectRes = await apiClient.integrations.selectAccount('meta', {
+      discoveryToken,
+      platformAccountId: testDiscoveredAccounts[1].platformAccountId,
+      clientId: targetClient.id,
+    });
+    const connectedDiscovered = selectRes.data?.account;
+    assert('selectAccount endpoint connects chosen account', Boolean(connectedDiscovered && connectedDiscovered.id));
+    assert('Connected account matches chosen handle', connectedDiscovered.handle === '@acme.growth');
+    assert('Connected account status is ACTIVE', connectedDiscovered.status === 'ACTIVE');
+
+    // Section 7: AES-256-GCM Token Encryption & Decryption
+    console.log('\n[SECTION 7] AES-256-GCM Token Encryption & Decryption');
     const sampleToken = 'meta_oauth_long_lived_token_secret_abc123';
     const cipher = encryptToken(sampleToken);
     assert('Token encrypted into IV:Tag:Cipher format', cipher.includes(':'));
@@ -137,8 +187,8 @@ async function runSocialConnectionTests() {
     const plain = decryptToken(cipher);
     assert('Decrypted token matches original secret exactly', plain === sampleToken);
 
-    // Section 7: Live Account Connection & Encrypted Storage
-    console.log('\n[SECTION 7] Social Account Persistence in PostgreSQL');
+    // Section 8: Live Account Connection & Encrypted Storage
+    console.log('\n[SECTION 8] Social Account Persistence in PostgreSQL');
     const newAccount = await socialAccountsService.connectAccount({
       clientId: targetClient.id,
       platform: 'INSTAGRAM',
@@ -146,29 +196,32 @@ async function runSocialConnectionTests() {
     });
     assert('connectAccount() persists record in PostgreSQL', Boolean(newAccount && newAccount.id));
 
-    // Section 8: Live Account Sync & Decrypted Health
-    console.log('\n[SECTION 8] Live Account Sync & Health Verification');
+    // Section 9: Live Account Sync & Decrypted Health
+    console.log('\n[SECTION 9] Live Account Sync & Health Verification');
     const syncRes = await apiClient.integrations.sync(newAccount.id);
     assert('sync endpoint responds with normalized status', Boolean(syncRes.data));
 
-    // Section 9: Reconnect Initiation & Token Replacement
-    console.log('\n[SECTION 9] Live Account Reconnect Initiation');
+    // Section 10: Reconnect Initiation & Token Replacement
+    console.log('\n[SECTION 10] Live Account Reconnect Initiation');
     const reconnectRes = await apiClient.integrations.reconnect(newAccount.id, { platform: 'INSTAGRAM' });
     assert(
       'reconnect endpoint initiates OAuth flow',
       reconnectRes.data?.status === 'CONFIGURATION_REQUIRED' || reconnectRes.data?.status === 'CONNECTABLE'
     );
 
-    // Section 10: Disconnect & Credential Purge
-    console.log('\n[SECTION 10] Disconnect Account & Purge Credentials');
+    // Section 11: Disconnect Account & Purge Credentials
+    console.log('\n[SECTION 11] Disconnect Account & Purge Credentials');
     const disconnectRes = await apiClient.integrations.disconnect(newAccount.id);
     assert('disconnect endpoint marks account disconnected', Boolean(disconnectRes.data));
 
-    // Clean up
+    // Clean up created accounts
     await socialAccountsService.disconnectAccount(newAccount.id);
+    if (connectedDiscovered?.id) {
+      await socialAccountsService.disconnectAccount(connectedDiscovered.id);
+    }
 
-    // Section 11: Cross-Tenant Protection
-    console.log('\n[SECTION 11] Cross-Tenant Protection');
+    // Section 12: Cross-Tenant Protection
+    console.log('\n[SECTION 12] Cross-Tenant Protection');
     let crossTenantCaught = false;
     try {
       await apiClient.integrations.sync('nonexistent-account-999');

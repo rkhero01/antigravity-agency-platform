@@ -218,6 +218,31 @@ export const socialAccountsService = {
   },
 
   /**
+   * Handle incoming OAuth callback parameters (code, state)
+   */
+  async handleOAuthCallback(provider, { code, state, redirectUri = null }) {
+    const response = await apiClient.integrations.callback(provider.toLowerCase(), {
+      code,
+      state,
+      redirectUri,
+    });
+    return response.data;
+  },
+
+  /**
+   * Complete connection of selected discovered account
+   */
+  async selectAndConnectDiscoveredAccount({ provider, discoveryToken, platformAccountId, clientId = null }) {
+    const response = await apiClient.integrations.selectAccount(provider.toLowerCase(), {
+      discoveryToken,
+      platformAccountId,
+      clientId: clientId && clientId !== 'all' ? clientId : undefined,
+    });
+    const raw = response.data?.account || response.data;
+    return normalizeSocialAccount(raw);
+  },
+
+  /**
    * Calculate live KPI metrics from database records
    */
   calculateHealthMetrics(accountsList = []) {

@@ -1,10 +1,11 @@
 /**
  * Production Integration & OAuth Lifecycle Service
- * Task 11: Real Multi-Tenant Platform Connection, Token Lifecycle & Sync Engine
+ * Task 12: Real Multi-Tenant Platform Connection, Multi-Page Discovery & Selection Engine
  */
 
 import { getOAuthProvider, getAllOAuthStatus } from './oauth/providers/index.js';
 import { oauthStateStore } from './oauth/oauthStateStore.js';
+import { oauthDiscoveryStore } from './oauth/oauthDiscoveryStore.js';
 import { encryptToken, decryptToken, sanitizeAccountCredentials } from '../../utils/tokenEncryption.js';
 import { socialAccountRepository } from '../../repositories/socialAccountRepository.js';
 import { clientRepository } from '../../repositories/clientRepository.js';
@@ -75,7 +76,7 @@ export class IntegrationService {
   }
 
   /**
-   * Step 2: Handle incoming OAuth callback from external platform
+   * Step 2: Handle incoming OAuth callback & discover real accounts
    */
   async handleCallback({ providerName, code, state, redirectUri = null }) {
     if (!code) throw new ValidationError('Missing authorization code from OAuth provider.');
@@ -92,61 +93,130 @@ export class IntegrationService {
       redirectUri: redirectUri || stateRecord.redirectUri,
     });
 
-    // 3. Discover profile & identity
-    const profile = await provider.getAccountProfile({
+    // 3. Discover all available accounts/pages/channels
+    const discoveredAccounts = await provider.discoverAccounts({
       accessToken: tokenResult.accessToken,
     });
 
-    // 4. Encrypt sensitive tokens server-side (AES-256-GCM)
-    const encryptedAccessToken = encryptToken(tokenResult.accessToken);
-    const encryptedRefreshToken = tokenResult.refreshToken ? encryptToken(tokenResult.refreshToken) : null;
+    if (!discoveredAccounts || discoveredAccounts.length === 0) {
+      return {
+        success: false,
+        status: 'NO_ACCOUNTS_FOUND',
+        message: `No accessible accounts or pages found for ${provider.name}.`,
+      };
+    }
 
-    // 5. Look for existing SocialAccount record by platformAccountId in this agency
-    const existingAccounts = await socialAccountRepository.findMany({ agencyId });
-    const existing = existingAccounts.find(
-      (a) => !a.deletedAt && a.platformAccountId === profile.platformAccountId && a.platform === profile.platform
+    // 4. Create short-lived discovery session (token is never returned to frontend)
+    const discoveryToken = oauthDiscoveryStore.createSession({
+      agencyId,
+      clientId,
+      userId,
+      provider: provider.name,
+      tokenResult,
+      discoveredAccounts,
+    });
+
+    // Strip sensitive internal fields from discovered list before returning to client
+    const sanitizedAccounts = discoveredAccounts.map((acc) => ({
+      platformAccountId: acc.platformAccountId,
+      accountName: acc.accountName,
+      handle: acc.handle,
+      platform: acc.platform,
+      platformLabel: acc.platformLabel || acc.platform,
+      avatarUrl: acc.avatarUrl || null,
+      category: acc.metadata?.category || null,
+    }));
+
+    return {
+      success: true,
+      status: 'DISCOVERY_REQUIRED',
+      discoveryToken,
+      provider: provider.name,
+      clientId,
+      accounts: sanitizedAccounts,
+    };
+  }
+
+  /**
+   * Step 3: User confirms selection of discovered account -> persist encrypted credentials
+   */
+  async selectAndConnectAccount({ providerName, discoveryToken, platformAccountId, clientId = null, agencyId, user }) {
+    if (!agencyId) throw new AuthorizationError('Agency tenant ID is required.');
+    if (!user) throw new AuthorizationError('Authenticated user is required.');
+
+    // 1. Consume discovery session
+    const session = oauthDiscoveryStore.validateAndConsumeSession(discoveryToken, agencyId, providerName);
+    const targetClientId = clientId || session.clientId;
+
+    if (targetClientId && targetClientId !== 'all') {
+      const client = await clientRepository.findById(targetClientId, agencyId);
+      if (!client) {
+        throw new NotFoundError(`Client workspace "${targetClientId}" not found in this agency.`);
+      }
+    }
+
+    // 2. Find selected account in discovery session
+    const targetAccount = session.discoveredAccounts.find(
+      (a) => a.platformAccountId === platformAccountId
     );
 
-    let savedAccount;
+    if (!targetAccount) {
+      throw new NotFoundError(`Discovered account "${platformAccountId}" not found in this OAuth session.`);
+    }
+
+    // 3. Encrypt sensitive tokens server-side (AES-256-GCM)
+    const encryptedAccessToken = encryptToken(session.tokenResult.accessToken);
+    const encryptedRefreshToken = session.tokenResult.refreshToken
+      ? encryptToken(session.tokenResult.refreshToken)
+      : null;
+
+    // 4. Look for existing record by platformAccountId in this agency
+    const existingAccounts = await socialAccountRepository.findMany({ agencyId });
+    const existing = existingAccounts.find(
+      (a) => !a.deletedAt && a.platformAccountId === targetAccount.platformAccountId && a.platform === targetAccount.platform
+    );
+
     const accountPayload = {
       agencyId,
-      clientId: clientId || null,
-      platform: profile.platform,
-      accountName: profile.accountName,
-      handle: profile.handle,
-      platformAccountId: profile.platformAccountId,
+      clientId: targetClientId && targetClientId !== 'all' ? targetClientId : null,
+      platform: targetAccount.platform,
+      accountName: targetAccount.accountName,
+      handle: targetAccount.handle,
+      platformAccountId: targetAccount.platformAccountId,
       status: 'ACTIVE',
-      tokenExpiresAt: tokenResult.tokenExpiresAt,
-      scopes: tokenResult.scopes,
+      tokenExpiresAt: session.tokenResult.tokenExpiresAt,
+      scopes: session.tokenResult.scopes,
       metadataJson: JSON.stringify({
-        ...profile.metadata,
+        ...targetAccount.metadata,
+        avatarUrl: targetAccount.avatarUrl || null,
         encryptedAccessToken,
         encryptedRefreshToken,
         lastConnectedAt: new Date().toISOString(),
       }),
     };
 
+    let savedAccount;
     if (existing) {
       savedAccount = await socialAccountRepository.update(existing.id, accountPayload, agencyId);
       await auditService.log({
-        actorId: userId,
+        actorId: user.userId,
         agencyId,
-        clientId,
+        clientId: targetClientId,
         action: 'OAUTH_CONNECTED',
         entityType: 'SOCIAL_ACCOUNT',
         entityId: existing.id,
-        metadata: { platform: profile.platform, platformAccountId: profile.platformAccountId, mode: 'RECONNECT' },
+        metadata: { platform: targetAccount.platform, platformAccountId: targetAccount.platformAccountId, mode: 'RECONNECT' },
       });
     } else {
       savedAccount = await socialAccountRepository.create(accountPayload, agencyId);
       await auditService.log({
-        actorId: userId,
+        actorId: user.userId,
         agencyId,
-        clientId,
+        clientId: targetClientId,
         action: 'OAUTH_CONNECTED',
         entityType: 'SOCIAL_ACCOUNT',
         entityId: savedAccount.id,
-        metadata: { platform: profile.platform, platformAccountId: profile.platformAccountId, mode: 'NEW_CONNECTION' },
+        metadata: { platform: targetAccount.platform, platformAccountId: targetAccount.platformAccountId, mode: 'NEW_CONNECTION' },
       });
     }
 

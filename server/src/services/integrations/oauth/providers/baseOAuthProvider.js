@@ -1,6 +1,6 @@
 /**
  * Base Platform OAuth Provider Interface
- * Task 11: Common Provider Abstraction for Platform Connection & Identity Discovery
+ * Task 12: Account Discovery & Identity Verification
  */
 
 import { ValidationError } from '../../../../utils/errors.js';
@@ -27,12 +27,19 @@ export class BaseOAuthProvider {
   }
 
   async revoke({ accessToken }) {
-    // Default no-op if platform does not require explicit token revocation
     return { success: true };
   }
 
   async getAccountProfile({ accessToken }) {
     throw new Error(`getAccountProfile() must be implemented by ${this.name}`);
+  }
+
+  /**
+   * Discovers all available accounts, pages, channels, and identities
+   */
+  async discoverAccounts({ accessToken }) {
+    const profile = await this.getAccountProfile({ accessToken });
+    return profile ? [profile] : [];
   }
 
   ensureConfigured() {

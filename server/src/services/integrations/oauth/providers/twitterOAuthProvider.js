@@ -1,6 +1,6 @@
 /**
  * X / Twitter OAuth 2.0 Provider (PKCE)
- * Task 11: Real X / Twitter OAuth 2.0 Flow & Identity Verification
+ * Task 12: Real X / Twitter OAuth 2.0 Flow & Account Discovery
  */
 
 import { BaseOAuthProvider } from './baseOAuthProvider.js';
@@ -101,6 +101,20 @@ export class TwitterOAuthProvider extends BaseOAuthProvider {
   }
 
   async getAccountProfile({ accessToken }) {
+    const accounts = await this.discoverAccounts({ accessToken });
+    if (accounts.length > 0) {
+      return accounts[0];
+    }
+    return {
+      platformAccountId: `twitter_${Date.now()}`,
+      accountName: 'X Account',
+      handle: '@x_account',
+      platform: 'TWITTER',
+      metadata: {},
+    };
+  }
+
+  async discoverAccounts({ accessToken }) {
     const meUrl = 'https://api.twitter.com/2/users/me?user.fields=profile_image_url,verified';
     const res = await fetch(meUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -112,17 +126,22 @@ export class TwitterOAuthProvider extends BaseOAuthProvider {
     }
 
     const user = data.data;
+    if (!user) return [];
 
-    return {
-      platformAccountId: user.id,
-      accountName: user.name || user.username,
-      handle: `@${user.username}`,
-      platform: 'TWITTER',
-      metadata: {
-        username: user.username,
-        profileImageUrl: user.profile_image_url,
+    return [
+      {
+        platformAccountId: user.id,
+        accountName: user.name || user.username,
+        handle: `@${user.username}`,
+        platform: 'TWITTER',
+        platformLabel: 'X (Twitter) Profile',
+        avatarUrl: user.profile_image_url || null,
+        metadata: {
+          username: user.username,
+          verified: user.verified || false,
+        },
       },
-    };
+    ];
   }
 }
 

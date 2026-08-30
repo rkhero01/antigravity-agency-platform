@@ -354,6 +354,7 @@ class ApiClient {
       status: () => this.get('/api/v1/integrations/status'),
       connect: (provider, params) => this.get(`/api/v1/integrations/${provider}/connect`, { params }),
       callback: (provider, params) => this.get(`/api/v1/integrations/${provider}/callback`, { params }),
+      selectAccount: (provider, data) => this.post(`/api/v1/integrations/${provider}/select-account`, data),
       sync: (id) => this.post(`/api/v1/integrations/${id}/sync`),
       reconnect: (id, data) => this.post(`/api/v1/integrations/${id}/reconnect`, data),
       disconnect: (id) => this.delete(`/api/v1/integrations/${id}`),

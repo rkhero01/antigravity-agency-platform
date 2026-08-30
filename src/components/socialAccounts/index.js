@@ -6,3 +6,4 @@ export { SocialAccountsTable } from './SocialAccountsTable.jsx';
 export { SocialAccountCard } from './SocialAccountCard.jsx';
 export { ConnectAccountModal } from './ConnectAccountModal.jsx';
 export { AccountDetailModal } from './AccountDetailModal.jsx';
+export { AccountDiscoveryModal } from './AccountDiscoveryModal.jsx';

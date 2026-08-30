@@ -1,6 +1,6 @@
 /**
  * Platform Integrations & OAuth Controller
- * Task 11: REST Handlers for Platform Authentication & Token Synchronization
+ * Task 12: REST Handlers for Platform Authentication, Account Discovery & Selection
  */
 
 import { integrationService } from '../services/integrations/integrationService.js';
@@ -66,6 +66,34 @@ export async function handleCallback(req, res, next) {
   }
 }
 
+export async function selectAccount(req, res, next) {
+  try {
+    checkIntegrationMutationPermission(req.user.role);
+    const { provider } = req.params;
+    const { discoveryToken, platformAccountId, clientId } = req.body;
+
+    if (!discoveryToken) {
+      throw new ValidationError('Discovery session token is required.');
+    }
+    if (!platformAccountId) {
+      throw new ValidationError('Target platform account ID is required.');
+    }
+
+    const result = await integrationService.selectAndConnectAccount({
+      providerName: provider,
+      discoveryToken,
+      platformAccountId,
+      clientId,
+      agencyId: req.agencyId,
+      user: req.user,
+    });
+
+    return sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function syncAccount(req, res, next) {
   try {
     checkIntegrationMutationPermission(req.user.role);
@@ -112,6 +140,7 @@ export const integrationController = {
   getProviderStatus,
   initiateConnect,
   handleCallback,
+  selectAccount,
   syncAccount,
   reconnectAccount,
   disconnectAccount,

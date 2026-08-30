@@ -7,10 +7,11 @@ import {
   SocialAccountsTable,
   ConnectAccountModal,
   AccountDetailModal,
+  AccountDiscoveryModal,
 } from '../../components/socialAccounts/index.js';
 import { socialAccountsService } from '../../services/socialAccountsService.js';
 import { authSessionService } from '../../services/authSessionService.js';
-import { CheckCircle2, AlertCircle, RefreshCw, Share2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw, Share2, Sparkles } from 'lucide-react';
 
 export function SocialAccountsPage({
   activeClient = 'all',
@@ -21,6 +22,7 @@ export function SocialAccountsPage({
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isConnectingOAuth, setIsConnectingOAuth] = useState(false);
+  const [isProcessingCallback, setIsProcessingCallback] = useState(false);
   const [error, setError] = useState(null);
 
   // View Mode & Filters
@@ -33,6 +35,7 @@ export function SocialAccountsPage({
   // Modals & Feedback
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [inspectedAccount, setInspectedAccount] = useState(null);
+  const [discoverySessionData, setDiscoverySessionData] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // RBAC Permission Check
@@ -41,6 +44,7 @@ export function SocialAccountsPage({
 
   useEffect(() => {
     loadAccounts();
+    checkIncomingOAuthCallback();
   }, [selectedClientFilter]);
 
   useEffect(() => {
@@ -53,7 +57,46 @@ export function SocialAccountsPage({
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3500);
+    }, 4000);
+  };
+
+  /**
+   * Check for incoming OAuth redirect code & state in URL query
+   */
+  const checkIncomingOAuthCallback = async () => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const errorParam = params.get('error') || params.get('error_description');
+    const providerParam = params.get('provider') || 'meta';
+
+    if (errorParam) {
+      showToast(`OAuth Error: ${errorParam}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (code && state) {
+      setIsProcessingCallback(true);
+      try {
+        const result = await socialAccountsService.handleOAuthCallback(providerParam, { code, state });
+        if (result.status === 'DISCOVERY_REQUIRED' && result.accounts?.length > 0) {
+          setDiscoverySessionData(result);
+        } else if (result.status === 'NO_ACCOUNTS_FOUND') {
+          showToast(`Notice: ${result.message || 'No accessible accounts or pages found.'}`);
+        } else if (result.status === 'CONNECTED') {
+          showToast('✓ Social channel connected successfully!');
+          await loadAccounts(true);
+        }
+      } catch (err) {
+        console.error('OAuth Callback processing failed:', err);
+        showToast(`OAuth Failed: ${err.message || 'Failed to exchange authorization code.'}`);
+      } finally {
+        setIsProcessingCallback(false);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
   };
 
   const loadAccounts = async (silent = false) => {
@@ -85,6 +128,21 @@ export function SocialAccountsPage({
     const created = await socialAccountsService.connectAccount(accountData);
     await loadAccounts(true);
     showToast(`✓ Channel "${created.accountName}" connected successfully!`);
+  };
+
+  const handleConfirmDiscoveredAccount = async (selectionPayload) => {
+    setIsConnectingOAuth(true);
+    try {
+      const connected = await socialAccountsService.selectAndConnectDiscoveredAccount(selectionPayload);
+      await loadAccounts(true);
+      setDiscoverySessionData(null);
+      showToast(`✓ Connected "${connected.accountName}" (${connected.platformLabel || connected.platform}) successfully!`);
+    } catch (err) {
+      console.error('Failed to connect discovered account:', err);
+      throw err;
+    } finally {
+      setIsConnectingOAuth(false);
+    }
   };
 
   const handleInitiatePlatformOAuth = async (platformName) => {
@@ -201,6 +259,17 @@ export function SocialAccountsPage({
         </div>
       )}
 
+      {/* Processing Callback Modal Banner */}
+      {isProcessingCallback && (
+        <div className="oauth-processing-overlay">
+          <div className="oauth-processing-card">
+            <div className="clients-loading-spinner" />
+            <h3>Processing OAuth Authorization...</h3>
+            <p>Exchanging secure authorization code and discovering authorized platform pages.</p>
+          </div>
+        </div>
+      )}
+
       {/* Header & Filter Controls */}
       <SocialHeader
         viewMode={viewMode}
@@ -313,7 +382,7 @@ export function SocialAccountsPage({
         )}
       </div>
 
-      {/* Connect Account Modal */}
+      {/* Manual Connect Account Modal */}
       <ConnectAccountModal
         isOpen={isConnectModalOpen}
         onClose={() => setIsConnectModalOpen(false)}
@@ -330,6 +399,15 @@ export function SocialAccountsPage({
         onReconnect={handleReconnectAccount}
         onDisconnect={handleDisconnectAccount}
         canMutate={canMutate}
+      />
+
+      {/* Account Discovery & Selection Modal */}
+      <AccountDiscoveryModal
+        isOpen={Boolean(discoverySessionData)}
+        onClose={() => setDiscoverySessionData(null)}
+        discoveryData={discoverySessionData}
+        onConfirmSelection={handleConfirmDiscoveredAccount}
+        isConnecting={isConnectingOAuth}
       />
     </div>
   );
