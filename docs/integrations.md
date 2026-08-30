@@ -130,3 +130,36 @@ flowchart TD
 - **`DISCONNECTED` (Archived)**: Account unlinked, encrypted credentials purged from database.
 - **`CONFIGURATION_REQUIRED` (DevOps Setup)**: Missing provider App ID / Secret in hosting environment variables.
 - **`NO_ACCOUNTS_FOUND` (Empty Discovery)**: User completed OAuth flow but does not manage any pages, channels, or locations under that account.
+
+---
+
+## 6. Real Meta Leadgen Webhooks & CRM Integration
+
+### A. Pipeline Architecture
+```mermaid
+flowchart TD
+    MetaLeadAd["Meta Lead Ad Form Submission"] -->|1. Webhook Notification| WebhookEndpoint["GET/POST /api/v1/webhooks/meta"]
+    WebhookEndpoint -->|2. HMAC-SHA256 Validation| WebhookVerifier["Signature & Replay Verifier (300s Drift)"]
+    WebhookVerifier -->|3. PostgreSQL Deduplication| WebhookDeduplicator["WebhookEvent (@@unique([agencyId, eventId]))"]
+    WebhookDeduplicator -->|4. Resolve Page ID| SocialAccountRepo["SocialAccount (Active & Non-Deleted)"]
+    SocialAccountRepo -->|5. Decrypt Page Token| IntegrationService["integrationService.getValidAccessToken()"]
+    IntegrationService -->|6. Fetch Lead Data| MetaGraphAPI["Graph API GET /v19.0/{leadgen_id}"]
+    MetaGraphAPI -->|7. Normalize & Attribute| LeadNormalizer["Lead Normalization (Client & Campaign Attribution)"]
+    LeadNormalizer -->|8. Persist to DB| LeadRepo["PostgreSQL Lead Table (source: META_ADS)"]
+    LeadRepo -->|9. Audit Record| AuditService["auditService.log(META_LEAD_CREATED)"]
+    LeadRepo -->|10. Live Display| CRM["Agency Lead CRM & Editorial Views"]
+```
+
+### B. Meta Webhook Configuration
+- **Callback URL**: `https://antigravity-agency-platform.onrender.com/api/v1/webhooks/meta`
+- **Verify Token**: Configured via `META_WEBHOOK_VERIFY_TOKEN` (or `META_WA_WEBHOOK_SECRET`)
+- **App Secret**: `META_APP_SECRET` (used for `X-Hub-Signature-256` HMAC validation)
+- **Subscribed Fields**: `leadgen`, `feed`, `comments`, `messages`
+
+### C. Security & Data Integrity Guarantees
+1. **Multi-Tenant Isolation**: Page IDs are resolved strictly against the `SocialAccount` records belonging to the matching tenant `agencyId`. Cross-agency event delivery is immediately rejected with `403 Forbidden` / `404 Not Found`.
+2. **Replay Drift Protection**: Webhooks older than 300 seconds (5 minutes) are discarded to prevent replay attacks.
+3. **Idempotent Ingestion**: Every delivery persists a unique `WebhookEvent` record (`@@unique([agencyId, eventId])`). Duplicate deliveries return `{ duplicate: true }` without duplicating CRM leads.
+4. **Zero Secret Exposure**: Tokens and secrets are never emitted in logs or response payloads. Audit logs record entity IDs and timestamps only.
+5. **No Fabricated Leads**: If external Meta credentials or Page tokens are unconfigured or expired, the pipeline returns `CONFIGURATION_REQUIRED` or `REAUTH_REQUIRED` rather than creating synthetic data.
+

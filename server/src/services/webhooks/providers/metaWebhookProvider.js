@@ -1,6 +1,6 @@
 /**
  * Meta (Facebook Pages, Instagram, Lead Ads, WhatsApp) Webhook Provider
- * Task 13 — Phase 1: Real Signature Verification, Tenant Resolution & Event Normalization
+ * Task 13 — Phase 3: Real Meta Leadgen -> CRM Pipeline Integration
  */
 
 import crypto from 'crypto';
@@ -9,6 +9,7 @@ import { webhookVerifier } from '../../../webhooks/webhookVerifier.js';
 import { webhookDeduplicator } from '../../../webhooks/webhookDeduplicator.js';
 import { socialAccountRepository } from '../../../repositories/socialAccountRepository.js';
 import { leadRepository } from '../../../repositories/leadRepository.js';
+import { campaignRepository } from '../../../repositories/campaignRepository.js';
 import { integrationService } from '../../integrations/integrationService.js';
 import { auditService } from '../../auditService.js';
 import { ValidationError, NotFoundError, AuthorizationError } from '../../../utils/errors.js';
@@ -253,6 +254,16 @@ export class MetaWebhookProvider extends BaseWebhookProvider {
     );
 
     if (dedup.isDuplicate) {
+      await auditService.log({
+        actorId: 'WEBHOOK_META',
+        agencyId,
+        clientId,
+        action: 'META_LEAD_DUPLICATE',
+        entityType: 'WEBHOOK_EVENT',
+        entityId: normalizedEvent.eventId,
+        metadata: { eventId: normalizedEvent.eventId, eventType: normalizedEvent.eventType },
+      });
+
       return {
         success: true,
         duplicate: true,
@@ -265,10 +276,30 @@ export class MetaWebhookProvider extends BaseWebhookProvider {
     if (normalizedEvent.eventType === 'LEADGEN') {
       const leadgenId = normalizedEvent.payload.leadgenId;
 
+      await auditService.log({
+        actorId: 'WEBHOOK_META',
+        agencyId,
+        clientId,
+        action: 'META_LEAD_RECEIVED',
+        entityType: 'LEAD',
+        entityId: leadgenId,
+        metadata: { leadgenId, formId: normalizedEvent.payload.formId, pageId: normalizedEvent.platformAccountId },
+      });
+
       // Check if page access token is available for Graph API lead retrieval
       const accessToken = await integrationService.getValidAccessToken(account.id, agencyId);
 
       if (!accessToken) {
+        await auditService.log({
+          actorId: 'WEBHOOK_META',
+          agencyId,
+          clientId,
+          action: 'META_LEAD_FAILED',
+          entityType: 'LEAD',
+          entityId: leadgenId,
+          metadata: { reason: 'CONFIGURATION_REQUIRED', message: 'Active decrypted page token missing.' },
+        });
+
         return {
           success: false,
           status: 'CONFIGURATION_REQUIRED',
@@ -302,19 +333,32 @@ export class MetaWebhookProvider extends BaseWebhookProvider {
         const phone = fieldMap.phone_number || null;
         const company = fieldMap.company_name || null;
 
+        // Resolve real campaign attribution if existing matching campaign exists in this agency
+        let resolvedCampaignId = null;
+        if (normalizedEvent.payload.campaignId) {
+          const campaigns = await campaignRepository.findMany({ agencyId });
+          const matchingCampaign = campaigns.find(
+            (c) => !c.deletedAt && (c.externalCampaignId === String(normalizedEvent.payload.campaignId) || c.id === String(normalizedEvent.payload.campaignId))
+          );
+          if (matchingCampaign) {
+            resolvedCampaignId = matchingCampaign.id;
+          }
+        }
+
         const newLead = await leadRepository.create(
           {
             agencyId,
             clientId: clientId || 'c1',
+            campaignId: resolvedCampaignId,
             name: fullName,
             email,
             phone,
             company,
             source: 'META_ADS',
             stage: 'NEW',
-            score: 75,
+            score: phone && email ? 75 : 50,
             value: 0,
-            owner: 'Automated Webhook Ingestion',
+            owner: 'Meta Lead Ads Ingestion',
           },
           agencyId
         );
@@ -323,10 +367,15 @@ export class MetaWebhookProvider extends BaseWebhookProvider {
           actorId: 'WEBHOOK_META',
           agencyId,
           clientId,
-          action: 'LEAD_CREATED_FROM_WEBHOOK',
+          action: 'META_LEAD_CREATED',
           entityType: 'LEAD',
           entityId: newLead.id,
-          metadata: { leadgenId, formId: normalizedEvent.payload.formId },
+          metadata: {
+            leadgenId,
+            formId: normalizedEvent.payload.formId,
+            campaignId: resolvedCampaignId,
+            source: 'META_ADS',
+          },
         });
 
         return {
