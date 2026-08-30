@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle2 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
+import React, { useState, useEffect } from 'react';
+import { X, Sparkles, CheckCircle2, AlertCircle, Building, Share2, Target, Calendar } from 'lucide-react';
+import { clientsService } from '../../services/clientsService.js';
+import { socialAccountsService } from '../../services/socialAccountsService.js';
+import { campaignsService } from '../../services/campaignsService.js';
+import { CONTENT_FORMATS, CONTENT_PLATFORMS } from '../../services/contentService.js';
 
 export function PostComposerModal({
   isOpen,
@@ -9,324 +12,427 @@ export function PostComposerModal({
   initialClient,
   initialTitle,
   initialCaption,
-  initialHashtags,
   onCreatePost,
 }) {
+  const [clients, setClients] = useState([]);
+  const [socialAccounts, setSocialAccounts] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+
   const [formData, setFormData] = useState({
-    clientId: initialClient || 'c1',
-    type: 'Post',
+    clientId: initialClient || '',
+    socialAccountId: '',
+    campaignId: '',
+    format: 'CAROUSEL',
+    platform: 'INSTAGRAM',
     title: initialTitle || '',
     caption: initialCaption || '',
-    hashtagsInput: initialHashtags || '#Marketing #Growth #PulseAI',
-    platforms: ['instagram', 'facebook'],
-    scheduledDate: initialDate || '2026-08-28',
-    scheduledTime: '10:00 AM',
-    mediaPreview:
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-    status: 'Scheduled',
+    scheduledDate: initialDate || new Date().toISOString().split('T')[0],
+    scheduledTime: '10:00',
+    mediaPreview: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+    status: 'SCHEDULED',
   });
 
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPrerequisites();
+      setFormData({
+        clientId: initialClient && initialClient !== 'all' ? initialClient : '',
+        socialAccountId: '',
+        campaignId: '',
+        format: 'CAROUSEL',
+        platform: 'INSTAGRAM',
+        title: initialTitle || '',
+        caption: initialCaption || '',
+        scheduledDate: initialDate || new Date().toISOString().split('T')[0],
+        scheduledTime: '10:00',
+        mediaPreview: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+        status: 'SCHEDULED',
+      });
+      setErrors({});
+      setApiError(null);
+      setSuccessMessage(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen, initialDate, initialClient]);
+
+  const loadPrerequisites = async () => {
+    try {
+      const [clientList, socialList, campList] = await Promise.all([
+        clientsService.getClients(),
+        socialAccountsService.getAccounts(),
+        campaignsService.getCampaigns(),
+      ]);
+      setClients(clientList);
+      setSocialAccounts(socialList);
+      setCampaigns(campList);
+
+      if (!formData.clientId && clientList.length > 0) {
+        setFormData((prev) => ({ ...prev, clientId: clientList[0].id }));
+      }
+    } catch (e) {
+      console.error('Failed to load prerequisites in post composer:', e);
+    }
+  };
 
   if (!isOpen) return null;
 
-  const handlePlatformToggle = (plat) => {
-    setFormData((prev) => {
-      const exists = prev.platforms.includes(plat);
-      return {
-        ...prev,
-        platforms: exists ? prev.platforms.filter((p) => p !== plat) : [...prev.platforms, plat],
-      };
-    });
-  };
-
-  const handleAiGenerate = () => {
-    setIsGeneratingAi(true);
-    setTimeout(() => {
-      const clientObj = mockClients.find((c) => c.id === formData.clientId);
-      const brandName = clientObj ? clientObj.name : 'our brand';
-      setFormData((prev) => ({
-        ...prev,
-        title: prev.title || `Transform Your Routine with ${brandName}`,
-        caption: `✨ Consistency is the secret to high performance! Whether you are leveling up your daily workflow or scaling new heights, ${brandName} is here to guide your journey. 🚀 Tap the link in our bio to learn more and join our community today!`,
-        hashtagsInput: `#${brandName.replace(/\s+/g, '')} #GrowthMindset #DailyInspiration #MarketingAgency #PerformanceGoals`,
-      }));
-      setIsGeneratingAi(false);
-    }, 400);
-  };
-
-  const handleSubmit = (chosenStatus) => {
+  const validate = () => {
     const newErrors = {};
-    if (!formData.title.trim()) newErrors.title = 'Post title is required';
-    if (!formData.caption.trim()) newErrors.caption = 'Caption text is required';
-    if (formData.platforms.length === 0) newErrors.platforms = 'Select at least one platform';
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
+    if (!formData.title.trim() || formData.title.trim().length < 2) {
+      newErrors.title = 'Post title is required (min 2 characters).';
     }
-
-    const selectedClientObj = mockClients.find((c) => c.id === formData.clientId);
-
-    const parsedHashtags = formData.hashtagsInput
-      .split(' ')
-      .filter((h) => h.startsWith('#') || h.trim().length > 0)
-      .map((h) => (h.startsWith('#') ? h : `#${h}`));
-
-    onCreatePost({
-      clientId: formData.clientId,
-      clientName: selectedClientObj ? selectedClientObj.name : 'Agency Client',
-      type: formData.type,
-      title: formData.title.trim(),
-      caption: formData.caption.trim(),
-      hashtags: parsedHashtags,
-      platforms: formData.platforms,
-      scheduledDate: formData.scheduledDate,
-      scheduledTime: formData.scheduledTime,
-      mediaType: formData.type === 'Reel' || formData.type === 'Video' ? 'video' : 'image',
-      mediaPreview: formData.mediaPreview,
-      status: chosenStatus,
-    });
-
-    onClose();
+    if (!formData.clientId) {
+      newErrors.clientId = 'Please select a client workspace.';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const platformOptions = [
-    { id: 'instagram', label: 'Instagram' },
-    { id: 'facebook', label: 'Facebook' },
-    { id: 'linkedin', label: 'LinkedIn' },
-    { id: 'youtube', label: 'YouTube' },
-    { id: 'google-business', label: 'Google Business' },
-  ];
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setApiError(null);
+
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onCreatePost({
+        clientId: formData.clientId,
+        socialAccountId: formData.socialAccountId || null,
+        campaignId: formData.campaignId || null,
+        title: formData.title.trim(),
+        caption: formData.caption ? formData.caption.trim() : '',
+        format: formData.format,
+        platform: formData.platform,
+        mediaUrl: formData.mediaPreview || null,
+        status: formData.status,
+        scheduledDate: formData.scheduledDate,
+        scheduledTime: formData.scheduledTime,
+      });
+
+      setSuccessMessage(`Post "${formData.title.trim()}" created successfully in PostgreSQL!`);
+      setTimeout(() => {
+        onClose();
+      }, 700);
+    } catch (err) {
+      setApiError(err.message || 'Failed to create post in database.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Filter compatible social accounts and campaigns
+  const compatibleSocialAccounts = socialAccounts.filter((sa) => {
+    const matchesClient = !formData.clientId || sa.clientId === formData.clientId;
+    const matchesPlatform =
+      formData.platform === 'META'
+        ? sa.platform === 'META' || sa.platform === 'FACEBOOK' || sa.platform === 'INSTAGRAM'
+        : sa.platform === formData.platform;
+    return matchesClient && matchesPlatform;
+  });
+
+  const compatibleCampaigns = campaigns.filter((c) => !formData.clientId || c.clientId === formData.clientId);
 
   return (
-    <div className="modal-backdrop-overlay" onClick={onClose}>
-      <div className="modal-dialog-card post-composer-dialog" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+    <div className="modal-backdrop-overlay" onClick={isSubmitting ? undefined : onClose}>
+      <div
+        className="modal-dialog-card composer-modal-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
         <div className="modal-dialog-header">
           <div className="modal-title-with-icon">
             <div className="modal-icon-badge">
-              <Sparkles size={18} />
+              <Calendar size={18} />
             </div>
             <div>
-              <h3 className="modal-title">Multi-Platform Post Composer</h3>
-              <p className="modal-subtitle">Craft, format, and schedule omnichannel content</p>
+              <h3 className="modal-title">Create Social Asset & Editorial Post</h3>
+              <p className="modal-subtitle">
+                Compose, schedule, and assign multi-platform content to client pipeline
+              </p>
             </div>
           </div>
-          <button type="button" className="btn-close-modal" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="btn-close-modal"
+            onClick={onClose}
+            aria-label="Close"
+            disabled={isSubmitting}
+          >
             <X size={18} />
           </button>
         </div>
 
-        {/* Composer Form Body */}
-        <div className="composer-modal-body">
-          <div className="composer-two-columns">
-            {/* Left Column: Form Controls */}
-            <div className="composer-form-left">
-              {/* Client & Content Format */}
+        {/* API Error Banner */}
+        {apiError && (
+          <div className="modal-error-banner" role="alert">
+            <AlertCircle size={18} className="error-banner-icon" />
+            <span className="error-banner-text">{apiError}</span>
+          </div>
+        )}
+
+        {/* Success Banner */}
+        {successMessage && (
+          <div className="modal-success-banner" role="status">
+            <CheckCircle2 size={18} className="success-banner-icon" />
+            <span className="success-banner-text">{successMessage}</span>
+          </div>
+        )}
+
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="modal-form-body">
+          <div className="composer-form-grid">
+            {/* Left Column: Post Details */}
+            <div className="composer-fields-col">
               <div className="form-grid-two-col">
+                {/* Client Workspace */}
                 <div className="form-field-group">
-                  <label className="form-label">Client Workspace</label>
+                  <label className="form-label" htmlFor="composer-client">
+                    Client Workspace <span className="text-danger">*</span>
+                  </label>
                   <select
+                    id="composer-client"
                     value={formData.clientId}
                     onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                    disabled={isSubmitting}
+                    className="form-select-input"
+                    required
+                  >
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || c.clientName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.clientId && <span className="form-error-msg">{errors.clientId}</span>}
+                </div>
+
+                {/* Target Platform */}
+                <div className="form-field-group">
+                  <label className="form-label" htmlFor="composer-platform">
+                    Primary Target Platform <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    id="composer-platform"
+                    value={formData.platform}
+                    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+                    disabled={isSubmitting}
                     className="form-select-input"
                   >
-                    {mockClients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
+                    {CONTENT_PLATFORMS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Title / Topic */}
+              <div className="form-field-group full-width">
+                <label className="form-label" htmlFor="composer-title">
+                  Post Title / Editorial Headline <span className="text-danger">*</span>
+                </label>
+                <input
+                  id="composer-title"
+                  type="text"
+                  placeholder="e.g. Apex High-Intensity Summer Strength Challenge"
+                  value={formData.title}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (errors.title) setErrors({ ...errors, title: null });
+                  }}
+                  disabled={isSubmitting}
+                  className={`form-text-input ${errors.title ? 'error' : ''}`}
+                  required
+                />
+                {errors.title && <span className="form-error-msg">{errors.title}</span>}
+              </div>
+
+              {/* Caption / Copy */}
+              <div className="form-field-group full-width">
+                <label className="form-label" htmlFor="composer-caption">
+                  Post Caption & Body Copy
+                </label>
+                <textarea
+                  id="composer-caption"
+                  rows={4}
+                  placeholder="Write captivating caption copy with value proposition and clear call to action..."
+                  value={formData.caption}
+                  onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
+                  disabled={isSubmitting}
+                  className="form-textarea-input"
+                />
+              </div>
+
+              <div className="form-grid-two-col">
+                {/* Format */}
+                <div className="form-field-group">
+                  <label className="form-label" htmlFor="composer-format">
+                    Content Format <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    id="composer-format"
+                    value={formData.format}
+                    onChange={(e) => setFormData({ ...formData, format: e.target.value })}
+                    disabled={isSubmitting}
+                    className="form-select-input"
+                  >
+                    {CONTENT_FORMATS.map((f) => (
+                      <option key={f.value} value={f.value}>
+                        {f.label}
                       </option>
                     ))}
                   </select>
                 </div>
 
+                {/* Status */}
                 <div className="form-field-group">
-                  <label className="form-label">Content Format</label>
+                  <label className="form-label" htmlFor="composer-status">
+                    Initial Publishing Status
+                  </label>
                   <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    id="composer-status"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    disabled={isSubmitting}
                     className="form-select-input"
                   >
-                    <option value="Post">Standard Post</option>
-                    <option value="Reel">Reel / Short Video</option>
-                    <option value="Carousel">Carousel Slider</option>
-                    <option value="Story">24h Story</option>
-                    <option value="Video">Long-form Video</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="PENDING_APPROVAL">Pending Approval (In Review)</option>
+                    <option value="SCHEDULED">Scheduled</option>
                   </select>
                 </div>
               </div>
 
-              {/* Target Platforms */}
-              <div className="form-field-group">
-                <label className="form-label">
-                  Publish to Channels <span className="text-danger">*</span>
-                </label>
-                <div className="platform-checkboxes-grid">
-                  {platformOptions.map((opt) => {
-                    const isChecked = formData.platforms.includes(opt.id);
-                    return (
-                      <label
-                        key={opt.id}
-                        className={`platform-checkbox-label ${isChecked ? 'checked' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handlePlatformToggle(opt.id)}
-                          className="hidden-checkbox"
-                        />
-                        <span className="checkbox-custom-dot" />
-                        <span>{opt.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {errors.platforms && (
-                  <span className="form-error-msg">{errors.platforms}</span>
-                )}
-              </div>
-
-              {/* Title */}
-              <div className="form-field-group">
-                <label className="form-label">
-                  Post Hook / Working Title <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 5 Morning Mobility Exercises to Supercharge Your Day"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className={`form-text-input ${errors.title ? 'error' : ''}`}
-                />
-                {errors.title && <span className="form-error-msg">{errors.title}</span>}
-              </div>
-
-              {/* Caption & AI Assistant Action */}
-              <div className="form-field-group">
-                <div className="label-with-action-row">
-                  <label className="form-label">
-                    Caption Copy <span className="text-danger">*</span>
+              <div className="form-grid-two-col">
+                {/* Linked Social Account */}
+                <div className="form-field-group">
+                  <label className="form-label" htmlFor="composer-social">
+                    Linked Social Asset Channel
                   </label>
-                  <button
-                    type="button"
-                    className="btn-ai-compose-shortcut"
-                    onClick={handleAiGenerate}
-                    disabled={isGeneratingAi}
+                  <select
+                    id="composer-social"
+                    value={formData.socialAccountId}
+                    onChange={(e) => setFormData({ ...formData, socialAccountId: e.target.value })}
+                    disabled={isSubmitting}
+                    className="form-select-input"
                   >
-                    <Sparkles size={13} />
-                    <span>{isGeneratingAi ? 'Generating...' : 'Auto-Write with AI'}</span>
-                  </button>
+                    <option value="">Direct Channel / Standard Account</option>
+                    {compatibleSocialAccounts.map((sa) => (
+                      <option key={sa.id} value={sa.id}>
+                        {sa.accountName} ({sa.platform})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <textarea
-                  rows={4}
-                  placeholder="Write your engaging post caption here..."
-                  value={formData.caption}
-                  onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
-                  className={`form-textarea-input ${errors.caption ? 'error' : ''}`}
-                />
-                {errors.caption && <span className="form-error-msg">{errors.caption}</span>}
-              </div>
 
-              {/* Hashtags */}
-              <div className="form-field-group">
-                <label className="form-label">Hashtag Clusters</label>
-                <input
-                  type="text"
-                  placeholder="#Fitness #Health #GymGoals"
-                  value={formData.hashtagsInput}
-                  onChange={(e) => setFormData({ ...formData, hashtagsInput: e.target.value })}
-                  className="form-text-input"
-                />
+                {/* Linked Campaign */}
+                <div className="form-field-group">
+                  <label className="form-label" htmlFor="composer-campaign">
+                    Linked Marketing Campaign
+                  </label>
+                  <select
+                    id="composer-campaign"
+                    value={formData.campaignId}
+                    onChange={(e) => setFormData({ ...formData, campaignId: e.target.value })}
+                    disabled={isSubmitting}
+                    className="form-select-input"
+                  >
+                    <option value="">No Campaign (Organic Content)</option>
+                    {compatibleCampaigns.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || c.title} ({c.platform})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Schedule Date & Time */}
               <div className="form-grid-two-col">
                 <div className="form-field-group">
-                  <label className="form-label">Publish Date</label>
+                  <label className="form-label" htmlFor="composer-date">
+                    Scheduled Publish Date
+                  </label>
                   <input
+                    id="composer-date"
                     type="date"
                     value={formData.scheduledDate}
                     onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
+                    disabled={isSubmitting}
                     className="form-text-input"
                   />
                 </div>
 
                 <div className="form-field-group">
-                  <label className="form-label">Publish Time</label>
+                  <label className="form-label" htmlFor="composer-time">
+                    Scheduled Time
+                  </label>
                   <input
-                    type="text"
-                    placeholder="09:00 AM"
+                    id="composer-time"
+                    type="time"
                     value={formData.scheduledTime}
                     onChange={(e) => setFormData({ ...formData, scheduledTime: e.target.value })}
+                    disabled={isSubmitting}
                     className="form-text-input"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Live Feed Simulation Preview */}
-            <div className="composer-preview-right">
-              <h4 className="preview-heading">Live Channel Preview</h4>
-              <div className="live-mock-social-card">
-                <div className="mock-card-header">
-                  <div className="mock-avatar">🏢</div>
-                  <div>
-                    <span className="mock-client-name">
-                      {mockClients.find((c) => c.id === formData.clientId)?.name || 'Brand'}
-                    </span>
-                    <span className="mock-time-sub">Sponsored / Scheduled</span>
+            {/* Right Column: Visual Preview */}
+            <div className="composer-preview-col">
+              <span className="composer-preview-title">Asset Live Preview</span>
+              <div className="composer-preview-card">
+                <img
+                  src={formData.mediaPreview}
+                  alt="Post preview"
+                  className="composer-preview-img"
+                  onError={(e) => {
+                    e.target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80';
+                  }}
+                />
+                <div className="composer-preview-meta">
+                  <div className="preview-tags-row">
+                    <span className="platform-tag-pill">{formData.platform}</span>
+                    <span className="format-tag-pill">{formData.format}</span>
                   </div>
-                </div>
-
-                <div className="mock-image-container">
-                  <img
-                    src={formData.mediaPreview}
-                    alt="Creative Preview"
-                    className="mock-image"
-                  />
-                  <span className="mock-format-tag">{formData.type}</span>
-                </div>
-
-                <div className="mock-caption-box">
-                  <p className="mock-caption-text">
-                    {formData.caption || 'Your caption copy will appear here in real-time...'}
-                  </p>
-                  <p className="mock-hashtags-text">{formData.hashtagsInput}</p>
+                  <strong className="preview-headline">{formData.title || 'Untitled Post'}</strong>
+                  <p className="preview-body">{formData.caption || 'No caption text provided yet.'}</p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Modal Footer Workflow Actions */}
-        <div className="modal-dialog-footer composer-footer">
-          <button type="button" className="btn-saas-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-saas-secondary"
-            onClick={() => handleSubmit('Draft')}
-          >
-            Save as Draft
-          </button>
-          <button
-            type="button"
-            className="btn-saas-secondary"
-            onClick={() => handleSubmit('In Review')}
-          >
-            Send for Review
-          </button>
-          <button
-            type="button"
-            className="btn-saas-primary"
-            onClick={() => handleSubmit('Scheduled')}
-          >
-            <CheckCircle2 size={16} />
-            <span>Approve & Schedule</span>
-          </button>
-        </div>
+          {/* Modal Footer */}
+          <div className="modal-dialog-footer">
+            <button
+              type="button"
+              className="btn-saas-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-create-post-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <span>Persisting to PostgreSQL...</span>
+              ) : (
+                <span>Schedule & Save Post</span>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

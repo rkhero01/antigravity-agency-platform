@@ -52,6 +52,7 @@ model Agency {
   invoices             Invoice[]
   auditLogs            AuditLog[]
   socialAccounts       SocialAccount[]
+  contentItems         ContentItem[]
 
   @@index([status])
   @@index([createdAt])
@@ -136,6 +137,7 @@ model Client {
   aiActions           AIAction[]
   auditLogs           AuditLog[]
   socialAccounts      SocialAccount[]
+  contentItems        ContentItem[]
 
   @@index([agencyId])
   @@index([status])
@@ -228,6 +230,7 @@ model Campaign {
   socialAccount      SocialAccount?   @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
   metrics            CampaignMetric[]
   leads              Lead[]
+  contentItems       ContentItem[]
 
   @@index([agencyId])
   @@index([clientId])
@@ -258,29 +261,73 @@ model CampaignMetric {
 // ------------------------------------------------------------------------------
 
 model SocialAccount {
-  id                String     @id @default(uuid())
+  id                String        @id @default(uuid())
   agencyId          String
   clientId          String?
-  platform          String     // META, FACEBOOK, INSTAGRAM, GOOGLE_BUSINESS, YOUTUBE, LINKEDIN
+  platform          String        // META, FACEBOOK, INSTAGRAM, GOOGLE_BUSINESS, YOUTUBE, LINKEDIN
   accountName       String
   handle            String?
   platformAccountId String?
-  status            String     @default("ACTIVE") // ACTIVE, NEEDS_REAUTH, DISCONNECTED, ERROR
+  status            String        @default("ACTIVE") // ACTIVE, NEEDS_REAUTH, DISCONNECTED, ERROR
   tokenExpiresAt    DateTime?
   scopes            String?
   metadataJson      String?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
   deletedAt         DateTime?
 
-  agency            Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  client            Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  agency            Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client            Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   campaigns         Campaign[]
+  contentItems      ContentItem[]
 
   @@index([agencyId])
   @@index([clientId])
   @@index([platform])
   @@index([status])
+}
+
+// ------------------------------------------------------------------------------
+// 4.6 CONTENT MANAGEMENT & CALENDAR
+// ------------------------------------------------------------------------------
+
+model ContentItem {
+  id              String         @id @default(uuid())
+  agencyId        String
+  clientId        String
+  socialAccountId String?
+  campaignId      String?
+  title           String
+  caption         String?        @default("")
+  format          String         @default("CAROUSEL") // CAROUSEL, REELS, IMAGE, VIDEO, THREAD, ARTICLE, STORY
+  platform        String         @default("INSTAGRAM") // INSTAGRAM, FACEBOOK, LINKEDIN, TWITTER, YOUTUBE, META
+  mediaUrl        String?
+  status          String         @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVED, SCHEDULED, PUBLISHED, REJECTED
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  author          String?        @default("Alex Morgan (You)")
+  approvedBy      String?
+  rejectionReason String?
+  likesCount      Int            @default(0)
+  commentsCount   Int            @default(0)
+  sharesCount     Int            @default(0)
+  metadataJson    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  agency          Agency         @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  campaign        Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([socialAccountId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([platform])
 }
 
 // ------------------------------------------------------------------------------

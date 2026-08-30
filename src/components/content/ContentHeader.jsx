@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CalendarDays,
   List,
   LayoutGrid,
   Plus,
-  Filter,
+  RefreshCw,
   Building,
 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
+import { clientsService } from '../../services/clientsService.js';
 
 export function ContentHeader({
   stageCounts,
@@ -20,8 +20,25 @@ export function ContentHeader({
   viewMode,
   onViewModeChange,
   onOpenComposer,
+  onRefresh,
+  isRefreshing,
 }) {
-  const formats = ['All Formats', 'Post', 'Reel', 'Story', 'Carousel', 'Video'];
+  const [clients, setClients] = useState([]);
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const clientList = await clientsService.getClients();
+      setClients(clientList);
+    } catch (e) {
+      console.error('Failed to load clients in content header:', e);
+    }
+  };
+
+  const formats = ['All Formats', 'Carousel', 'Reels / Shorts', 'Single Image', 'Video Post', 'Thread', 'Article / Newsletter', 'Story'];
 
   return (
     <div className="content-hub-header">
@@ -34,11 +51,23 @@ export function ContentHeader({
           </div>
           <h1 className="content-main-title">Content Calendar & Pipeline</h1>
           <p className="content-subtext">
-            Plan, review, schedule, and auto-publish multi-network marketing assets across Meta, LinkedIn, YouTube, and Google.
+            Plan, review, schedule, and orchestrate multi-network marketing assets across Meta, LinkedIn, YouTube, and Google directly connected to PostgreSQL.
           </p>
         </div>
 
         <div className="content-top-actions">
+          <button
+            type="button"
+            className="btn-saas-secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh database records"
+            aria-label="Refresh database records"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
           <button
             type="button"
             className="btn-create-post-primary"
@@ -59,76 +88,80 @@ export function ContentHeader({
         >
           All Stages ({stageCounts.total})
         </button>
+
         <button
           type="button"
-          className={`stage-pill-btn scheduled ${currentStage === 'Scheduled' ? 'active' : ''}`}
-          onClick={() => onStageChange('Scheduled')}
+          className={`stage-pill-btn scheduled ${currentStage === 'scheduled' ? 'active' : ''}`}
+          onClick={() => onStageChange('scheduled')}
         >
-          <span className="dot-scheduled" />
+          <span className="stage-dot scheduled" />
           Scheduled ({stageCounts.scheduled})
         </button>
+
         <button
           type="button"
-          className={`stage-pill-btn approved ${currentStage === 'Approved' ? 'active' : ''}`}
-          onClick={() => onStageChange('Approved')}
+          className={`stage-pill-btn approved ${currentStage === 'approved' ? 'active' : ''}`}
+          onClick={() => onStageChange('approved')}
         >
-          <span className="dot-approved" />
+          <span className="stage-dot approved" />
           Approved ({stageCounts.approved})
         </button>
+
         <button
           type="button"
-          className={`stage-pill-btn review ${currentStage === 'In Review' ? 'active' : ''}`}
-          onClick={() => onStageChange('In Review')}
+          className={`stage-pill-btn in-review ${currentStage === 'in review' ? 'active' : ''}`}
+          onClick={() => onStageChange('in review')}
         >
-          <span className="dot-review" />
+          <span className="stage-dot in-review" />
           In Review ({stageCounts.inReview})
         </button>
+
         <button
           type="button"
-          className={`stage-pill-btn draft ${currentStage === 'Draft' ? 'active' : ''}`}
-          onClick={() => onStageChange('Draft')}
+          className={`stage-pill-btn draft ${currentStage === 'draft' ? 'active' : ''}`}
+          onClick={() => onStageChange('draft')}
         >
-          <span className="dot-draft" />
+          <span className="stage-dot draft" />
           Drafts ({stageCounts.draft})
         </button>
+
         <button
           type="button"
-          className={`stage-pill-btn published ${currentStage === 'Published' ? 'active' : ''}`}
-          onClick={() => onStageChange('Published')}
+          className={`stage-pill-btn published ${currentStage === 'published' ? 'active' : ''}`}
+          onClick={() => onStageChange('published')}
         >
-          <span className="dot-published" />
+          <span className="stage-dot published" />
           Published ({stageCounts.published})
         </button>
       </div>
 
-      {/* Filter and View Control Toolbar */}
-      <div className="content-controls-toolbar">
-        <div className="toolbar-left-filters">
+      {/* Second Row Controls: Client Filter, Format Selector, View Switcher */}
+      <div className="content-controls-secondary-row">
+        <div className="content-left-filters">
           {/* Client Filter */}
-          <div className="toolbar-select-wrapper">
-            <Building size={14} className="icon-muted" />
+          <div className="content-filter-select-wrapper">
+            <Building size={14} className="filter-inline-icon" />
             <select
               value={selectedClient}
               onChange={(e) => onClientChange(e.target.value)}
-              className="toolbar-select-field"
+              className="content-select-input"
               aria-label="Filter by Client"
             >
-              <option value="all">🏢 All Client Accounts</option>
-              {mockClients.map((c) => (
+              <option value="all">All Client Workspaces</option>
+              {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.name || c.clientName}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Format Filter */}
-          <div className="toolbar-select-wrapper">
-            <Filter size={14} className="icon-muted" />
+          <div className="content-filter-select-wrapper">
             <select
               value={currentFormat}
               onChange={(e) => onFormatChange(e.target.value)}
-              className="toolbar-select-field"
+              className="content-select-input"
               aria-label="Filter by Format"
             >
               {formats.map((f) => (
@@ -140,31 +173,34 @@ export function ContentHeader({
           </div>
         </div>
 
-        {/* View Switcher: Calendar / List / Grid */}
-        <div className="view-mode-tabs-group" role="group" aria-label="View Mode">
+        {/* View Mode Toggle Buttons */}
+        <div className="content-view-mode-toggle" role="group" aria-label="View Mode">
           <button
             type="button"
-            className={`view-tab-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+            className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
             onClick={() => onViewModeChange('calendar')}
+            title="Calendar View"
           >
-            <CalendarDays size={15} />
+            <CalendarDays size={16} />
             <span>Calendar</span>
           </button>
           <button
             type="button"
-            className={`view-tab-btn ${viewMode === 'list' ? 'active' : ''}`}
+            className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
             onClick={() => onViewModeChange('list')}
+            title="List / Table View"
           >
-            <List size={15} />
-            <span>List & Feed</span>
+            <List size={16} />
+            <span>List</span>
           </button>
           <button
             type="button"
-            className={`view-tab-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
             onClick={() => onViewModeChange('grid')}
+            title="Grid View"
           >
-            <LayoutGrid size={15} />
-            <span>Media Grid</span>
+            <LayoutGrid size={16} />
+            <span>Cards</span>
           </button>
         </div>
       </div>

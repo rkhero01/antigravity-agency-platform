@@ -301,6 +301,21 @@ class ApiClient {
     };
   }
 
+  // 8. Content & Editorial Pipeline
+  get content() {
+    return {
+      list: (params) => this.get('/api/v1/content', { params }),
+      calendar: (params) => this.get('/api/v1/content/calendar', { params }),
+      get: (id) => this.get(`/api/v1/content/${id}`),
+      create: (data) => this.post('/api/v1/content', data),
+      update: (id, data) => this.patch(`/api/v1/content/${id}`, data),
+      schedule: (id, data) => this.post(`/api/v1/content/${id}/schedule`, data),
+      approve: (id) => this.post(`/api/v1/content/${id}/approve`),
+      reject: (id, data) => this.post(`/api/v1/content/${id}/reject`, data),
+      delete: (id) => this.delete(`/api/v1/content/${id}`),
+    };
+  }
+
   // 8. WhatsApp Marketing, Inbox & Automations
   get whatsapp() {
     return {
