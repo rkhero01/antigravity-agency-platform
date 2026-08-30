@@ -170,6 +170,7 @@ model Lead {
   id              String    @id @default(uuid())
   agencyId        String
   clientId        String
+  campaignId      String?
   name            String
   company         String?
   email           String?
@@ -186,9 +187,11 @@ model Lead {
 
   agency          Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([agencyId])
   @@index([clientId])
+  @@index([campaignId])
   @@index([stage])
   @@index([status])
 }
@@ -224,6 +227,7 @@ model Campaign {
   client             Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   socialAccount      SocialAccount?   @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
   metrics            CampaignMetric[]
+  leads              Lead[]
 
   @@index([agencyId])
   @@index([clientId])

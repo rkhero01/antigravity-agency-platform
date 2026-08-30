@@ -3,7 +3,6 @@ import {
   Users,
   UserPlus,
   CheckCircle2,
-  Clock,
   Award,
   TrendingUp,
   DollarSign,
@@ -15,72 +14,63 @@ export function CRMKpiCards({ overview = {} }) {
     {
       id: 'total',
       title: 'Total Inbound Leads',
-      value: overview.totalLeads || '1,480',
-      subtitle: 'Aggregate captured contacts',
-      change: overview.totalLeadsMoM || '+24.5% vs Last Mo',
+      value: overview.totalLeads || '0',
+      subtitle: 'Total pipeline contacts',
+      change: overview.totalLeadsMoM || 'Database records',
       icon: Users,
       color: '#3b82f6',
     },
     {
       id: 'today',
-      title: 'New Leads Today',
-      value: overview.newLeadsToday || '38 Leads',
-      subtitle: 'Inbound ads & website forms',
-      change: overview.newLeadsMoM || '+12 Today',
+      title: 'New Inbound',
+      value: overview.newLeadsToday || '0 Leads',
+      subtitle: 'Awaiting discovery contact',
+      change: overview.newLeadsMoM || 'Awaiting First Touch',
       icon: UserPlus,
       color: '#06b6d4',
     },
     {
       id: 'qualified',
-      title: 'Qualified Sales Leads',
-      value: overview.qualifiedLeads || '624 Leads',
-      subtitle: 'Passed AI scoring threshold',
-      change: overview.qualifiedMoM || '48.2% Qual Rate',
+      title: 'Qualified Leads (SQL)',
+      value: overview.qualifiedLeads || '0 Leads',
+      subtitle: 'Active opportunities',
+      change: overview.qualifiedMoM || '0% Qual Rate',
       icon: CheckCircle2,
       color: '#6366f1',
     },
     {
-      id: 'followups',
-      title: 'Follow-ups Due Today',
-      value: overview.followUpsDue || '18 Due Today',
-      subtitle: 'High-priority sales touches',
-      change: overview.followUpsMoM || '2 Overdue Priority',
-      icon: Clock,
-      color: '#f59e0b',
-    },
-    {
       id: 'won',
       title: 'Deals Closed Won',
-      value: overview.wonLeads || '215 Deals',
+      value: overview.wonLeads || '0 Deals',
       subtitle: 'Executed client contracts',
-      change: overview.wonLeadsMoM || '+34 Deals Won',
+      change: overview.wonLeadsMoM || '0 Closed Won',
       icon: Award,
       color: '#10b981',
     },
     {
-      id: 'rate',
-      title: 'Lead Conversion Rate',
-      value: overview.conversionRate || '16.8%',
-      subtitle: 'Visitor to closed customer',
-      change: overview.conversionMoM || '+3.2% Lift',
+      id: 'conversion',
+      title: 'Conversion Rate',
+      value: overview.conversionRate || '0.0%',
+      subtitle: 'Inbound to closed win ratio',
+      change: overview.conversionMoM || '0.0% Win Rate',
       icon: TrendingUp,
-      color: '#a855f7',
+      color: '#ec4899',
     },
     {
       id: 'pipeline',
       title: 'Active Pipeline Value',
-      value: overview.pipelineValue || '$1,840,000',
-      subtitle: 'Total unclosed deal size',
-      change: overview.pipelineMoM || '+18.2% Pipeline',
+      value: overview.pipelineValue || '$0',
+      subtitle: 'In-flight potential revenue',
+      change: overview.pipelineMoM || '$0 Pipeline',
       icon: Briefcase,
-      color: '#ec4899',
+      color: '#8b5cf6',
     },
     {
       id: 'revenue',
-      title: 'Total Revenue Won',
-      value: overview.revenueWon || '$642,500',
-      subtitle: 'Direct closed sales revenue',
-      change: overview.revenueMoM || '+$148,000 Won',
+      title: 'Closed Won Revenue',
+      value: overview.revenueWon || '$0',
+      subtitle: 'Realized contract ARR/MRR',
+      change: overview.revenueMoM || '$0 Won Revenue',
       icon: DollarSign,
       color: '#10b981',
     },
@@ -89,26 +79,27 @@ export function CRMKpiCards({ overview = {} }) {
   return (
     <div className="crm-kpis-grid">
       {cards.map((card) => {
-        const IconComponent = card.icon;
+        const Icon = card.icon;
         return (
           <div key={card.id} className="crm-kpi-card">
-            <div className="kpi-top-row">
-              <span className="kpi-title-label">{card.title}</span>
+            <div className="crm-kpi-header">
               <div
-                className="kpi-icon-pill"
-                style={{ background: `${card.color}20`, color: card.color }}
+                className="crm-kpi-icon-pill"
+                style={{
+                  background: `${card.color}20`,
+                  color: card.color,
+                  border: `1px solid ${card.color}40`,
+                }}
               >
-                <IconComponent size={15} />
+                <Icon size={16} />
               </div>
+              <span className="crm-kpi-change-tag">{card.change}</span>
             </div>
 
-            <div className="kpi-value-block">
-              <span className="kpi-main-number">{card.value}</span>
-            </div>
-
-            <div className="kpi-bottom-row">
-              <span className="kpi-change-tag positive">{card.change}</span>
-              <span className="kpi-subtext">{card.subtitle}</span>
+            <div className="crm-kpi-body">
+              <span className="crm-kpi-title">{card.title}</span>
+              <strong className="crm-kpi-value">{card.value}</strong>
+              <span className="crm-kpi-subtitle">{card.subtitle}</span>
             </div>
           </div>
         );

@@ -1,52 +1,138 @@
-import React, { useState } from 'react';
-import { X, UserPlus, CheckCircle2 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
-import { CRM_STAGES } from './LeadPipeline.jsx';
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Plus,
+  UserPlus,
+  AlertCircle,
+  CheckCircle2,
+  Building,
+  DollarSign,
+  Phone,
+  Mail,
+  Target,
+} from 'lucide-react';
+import { clientsService } from '../../services/clientsService.js';
+import { campaignsService } from '../../services/campaignsService.js';
+import { CRM_STAGES, CRM_SOURCES } from '../../services/crmService.js';
 
 export function AddLeadModal({
   isOpen,
   onClose,
-  onAddLead,
+  onCreateLead,
 }) {
+  const [clients, setClients] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [formData, setFormData] = useState({
+    clientId: '',
+    campaignId: '',
     name: '',
     company: '',
     email: '',
     phone: '',
-    clientId: 'c1',
-    source: 'Meta Ads',
-    campaign: 'VIP Acquisition Blitz',
-    value: '12000',
-    status: 'New Lead',
-    priority: 'High',
-    assignedStaff: 'Elena Rostova',
-    nextFollowUp: 'Tomorrow at 10:00 AM',
-    notes: '',
+    source: 'DIRECT',
+    stage: 'NEW',
+    value: '50000',
+    owner: '',
   });
 
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPrerequisites();
+      setFormData({
+        clientId: '',
+        campaignId: '',
+        name: '',
+        company: '',
+        email: '',
+        phone: '',
+        source: 'DIRECT',
+        stage: 'NEW',
+        value: '50000',
+        owner: '',
+      });
+      setErrors({});
+      setApiError(null);
+      setSuccessMessage(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const loadPrerequisites = async () => {
+    try {
+      const [clientList, campList] = await Promise.all([
+        clientsService.getClients(),
+        campaignsService.getCampaigns(),
+      ]);
+      setClients(clientList);
+      setCampaigns(campList);
+      if (clientList.length > 0) {
+        setFormData((prev) => ({ ...prev, clientId: clientList[0].id }));
+      }
+    } catch (e) {
+      console.error('Failed to load prerequisites in add lead modal:', e);
+    }
+  };
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const validate = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Contact name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email address is required';
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
+    if (!formData.name.trim() || formData.name.trim().length < 2) {
+      newErrors.name = 'Lead contact name is required (min 2 characters).';
     }
-
-    onAddLead(formData);
-    onClose();
+    if (!formData.clientId) {
+      newErrors.clientId = 'Please select a client workspace.';
+    }
+    if (formData.value === '' || isNaN(Number(formData.value)) || Number(formData.value) < 0) {
+      newErrors.value = 'Deal value must be a positive number.';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setApiError(null);
+
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onCreateLead({
+        clientId: formData.clientId,
+        campaignId: formData.campaignId || null,
+        name: formData.name.trim(),
+        company: formData.company ? formData.company.trim() : null,
+        email: formData.email ? formData.email.trim().toLowerCase() : null,
+        phone: formData.phone ? formData.phone.trim() : null,
+        source: formData.source,
+        stage: formData.stage,
+        value: Number(formData.value),
+        owner: formData.owner ? formData.owner.trim() : null,
+      });
+
+      setSuccessMessage(`Lead "${formData.name.trim()}" created successfully in PostgreSQL!`);
+      setTimeout(() => {
+        onClose();
+      }, 700);
+    } catch (err) {
+      setApiError(err.message || 'Failed to create lead in database.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const compatibleCampaigns = campaigns.filter((c) => !formData.clientId || c.clientId === formData.clientId);
+
   return (
-    <div className="modal-backdrop-overlay" onClick={onClose}>
+    <div className="modal-backdrop-overlay" onClick={isSubmitting ? undefined : onClose}>
       <div
-        className="modal-dialog-card add-lead-dialog"
+        className="modal-dialog-card connect-account-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -56,181 +142,250 @@ export function AddLeadModal({
               <UserPlus size={18} />
             </div>
             <div>
-              <h3 className="modal-title">Create Inbound Sales Lead</h3>
-              <p className="modal-subtitle">Register new contact, assign sales rep, and set automated follow-up cadence</p>
+              <h3 className="modal-title">Add New Inbound Lead</h3>
+              <p className="modal-subtitle">
+                Register contact opportunity bound to client CRM pipeline
+              </p>
             </div>
           </div>
-          <button type="button" className="btn-close-modal" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="btn-close-modal"
+            onClick={onClose}
+            aria-label="Close"
+            disabled={isSubmitting}
+          >
             <X size={18} />
           </button>
         </div>
 
+        {/* API Error Banner */}
+        {apiError && (
+          <div className="modal-error-banner" role="alert">
+            <AlertCircle size={18} className="error-banner-icon" />
+            <span className="error-banner-text">{apiError}</span>
+          </div>
+        )}
+
+        {/* Success Banner */}
+        {successMessage && (
+          <div className="modal-success-banner" role="status">
+            <CheckCircle2 size={18} className="success-banner-icon" />
+            <span className="success-banner-text">{successMessage}</span>
+          </div>
+        )}
+
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="add-lead-form">
+        <form onSubmit={handleSubmit} className="modal-form-body">
           <div className="form-grid-two-col">
+            {/* Client Workspace */}
             <div className="form-field-group">
-              <label className="form-label">
-                Full Name <span className="text-danger">*</span>
+              <label className="form-label" htmlFor="add-lead-client">
+                Client Workspace <span className="text-danger">*</span>
+              </label>
+              <select
+                id="add-lead-client"
+                value={formData.clientId}
+                onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                disabled={isSubmitting}
+                className="form-select-input"
+                required
+              >
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || c.clientName} ({c.industry || 'Client'})
+                  </option>
+                ))}
+              </select>
+              {errors.clientId && <span className="form-error-msg">{errors.clientId}</span>}
+            </div>
+
+            {/* Campaign Attribution */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="add-lead-campaign">
+                Campaign Attribution
+              </label>
+              <select
+                id="add-lead-campaign"
+                value={formData.campaignId}
+                onChange={(e) => setFormData({ ...formData, campaignId: e.target.value })}
+                disabled={isSubmitting}
+                className="form-select-input"
+              >
+                <option value="">Direct / Organic (No Campaign)</option>
+                {compatibleCampaigns.map((camp) => (
+                  <option key={camp.id} value={camp.id}>
+                    {camp.name || camp.title} ({camp.platform})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Contact Name */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="add-lead-name">
+                Contact Name <span className="text-danger">*</span>
               </label>
               <input
+                id="add-lead-name"
                 type="text"
-                required
-                placeholder="e.g. Alexander Wright"
+                placeholder="e.g. Karan Mehra"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (errors.name) setErrors({ ...errors, name: null });
+                }}
+                disabled={isSubmitting}
                 className={`form-text-input ${errors.name ? 'error' : ''}`}
+                required
               />
               {errors.name && <span className="form-error-msg">{errors.name}</span>}
             </div>
 
+            {/* Company Name */}
             <div className="form-field-group">
-              <label className="form-label">Company / Organization</label>
-              <input
-                type="text"
-                placeholder="e.g. Wright Capital Partners"
-                value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                className="form-text-input"
-              />
-            </div>
-          </div>
-
-          <div className="form-grid-two-col">
-            <div className="form-field-group">
-              <label className="form-label">
-                Email Address <span className="text-danger">*</span>
+              <label className="form-label" htmlFor="add-lead-company">
+                Company / Organization
               </label>
               <input
-                type="email"
-                required
-                placeholder="alex@wrightcapital.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className={`form-text-input ${errors.email ? 'error' : ''}`}
-              />
-              {errors.email && <span className="form-error-msg">{errors.email}</span>}
-            </div>
-
-            <div className="form-field-group">
-              <label className="form-label">Phone Number</label>
-              <input
-                type="tel"
-                placeholder="+1 (512) 555-0199"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                id="add-lead-company"
+                type="text"
+                placeholder="e.g. Gold Fit Gyms Pvt Ltd"
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                disabled={isSubmitting}
                 className="form-text-input"
               />
             </div>
-          </div>
 
-          <div className="form-grid-three-col">
+            {/* Email */}
             <div className="form-field-group">
-              <label className="form-label">Client Workspace</label>
+              <label className="form-label" htmlFor="add-lead-email">
+                Email Address
+              </label>
+              <input
+                id="add-lead-email"
+                type="email"
+                placeholder="karan@goldfit.in"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                disabled={isSubmitting}
+                className="form-text-input"
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="add-lead-phone">
+                Phone Number
+              </label>
+              <input
+                id="add-lead-phone"
+                type="tel"
+                placeholder="+91 98111 22334"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                disabled={isSubmitting}
+                className="form-text-input"
+              />
+            </div>
+
+            {/* Source */}
+            <div className="form-field-group">
+              <label className="form-label" htmlFor="add-lead-source">
+                Channel Source <span className="text-danger">*</span>
+              </label>
               <select
-                value={formData.clientId}
-                onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                id="add-lead-source"
+                value={formData.source}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                disabled={isSubmitting}
                 className="form-select-input"
               >
-                {mockClients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+                {CRM_SOURCES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Initial Stage */}
             <div className="form-field-group">
-              <label className="form-label">Lead Source</label>
+              <label className="form-label" htmlFor="add-lead-stage">
+                Pipeline Stage <span className="text-danger">*</span>
+              </label>
               <select
-                value={formData.source}
-                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                className="form-select-input"
-              >
-                <option value="Meta Ads">Meta Ads</option>
-                <option value="Google Ads">Google Ads</option>
-                <option value="Instagram">Instagram</option>
-                <option value="WhatsApp">WhatsApp</option>
-                <option value="Website">Website</option>
-                <option value="Organic Search">Organic Search</option>
-                <option value="Referral">Referral</option>
-              </select>
-            </div>
-
-            <div className="form-field-group">
-              <label className="form-label">Est. Deal Value ($)</label>
-              <input
-                type="number"
-                value={formData.value}
-                onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                className="form-text-input"
-              />
-            </div>
-          </div>
-
-          <div className="form-grid-three-col">
-            <div className="form-field-group">
-              <label className="form-label">Initial Stage</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                id="add-lead-stage"
+                value={formData.stage}
+                onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
+                disabled={isSubmitting}
                 className="form-select-input"
               >
                 {CRM_STAGES.map((st) => (
-                  <option key={st} value={st}>
-                    {st}
+                  <option key={st.value} value={st.value}>
+                    {st.label}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Deal Value */}
             <div className="form-field-group">
-              <label className="form-label">Priority</label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="form-select-input"
-              >
-                <option value="High">High Priority</option>
-                <option value="Medium">Medium Priority</option>
-                <option value="Low">Low Priority</option>
-              </select>
+              <label className="form-label" htmlFor="add-lead-value">
+                Estimated Deal Value ($) <span className="text-danger">*</span>
+              </label>
+              <input
+                id="add-lead-value"
+                type="number"
+                min="0"
+                step="500"
+                value={formData.value}
+                onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                disabled={isSubmitting}
+                className={`form-text-input ${errors.value ? 'error' : ''}`}
+                required
+              />
+              {errors.value && <span className="form-error-msg">{errors.value}</span>}
             </div>
 
+            {/* Lead Owner */}
             <div className="form-field-group">
-              <label className="form-label">Assigned Staff</label>
-              <select
-                value={formData.assignedStaff}
-                onChange={(e) => setFormData({ ...formData, assignedStaff: e.target.value })}
-                className="form-select-input"
-              >
-                <option value="Elena Rostova">Elena Rostova</option>
-                <option value="Marcus Chen">Marcus Chen</option>
-                <option value="Alex Rivera">Alex Rivera</option>
-                <option value="Sarah Jenkins">Sarah Jenkins</option>
-                <option value="David Vance">David Vance</option>
-              </select>
+              <label className="form-label" htmlFor="add-lead-owner">
+                Assigned Sales Operator
+              </label>
+              <input
+                id="add-lead-owner"
+                type="text"
+                placeholder="e.g. Diya Patel"
+                value={formData.owner}
+                onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                disabled={isSubmitting}
+                className="form-text-input"
+              />
             </div>
           </div>
 
-          <div className="form-field-group">
-            <label className="form-label">Initial Sales Notes</label>
-            <textarea
-              rows={2}
-              placeholder="Enter discovery notes, lead requirements, or referral context..."
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="form-textarea-input"
-            />
-          </div>
-
-          {/* Footer */}
+          {/* Modal Footer */}
           <div className="modal-dialog-footer">
-            <button type="button" className="btn-saas-secondary" onClick={onClose}>
+            <button
+              type="button"
+              className="btn-saas-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn-saas-primary">
-              <CheckCircle2 size={16} />
-              <span>Register Lead & Start Pipeline</span>
+            <button
+              type="submit"
+              className="btn-add-client-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <span>Persisting to PostgreSQL...</span>
+              ) : (
+                <span>Register Opportunity</span>
+              )}
             </button>
           </div>
         </form>

@@ -1,6 +1,6 @@
 /**
  * CRM Lead Management Routes
- * Task 28 — Step 2: Lead Pipeline Routes
+ * Task 7: Lead Pipeline Routes with Full CRUD & Soft Deletion
  */
 
 import { Router } from 'express';
@@ -14,9 +14,9 @@ leadRoutes.use(requireAuthentication);
 leadRoutes.use(tenantScopeMiddleware);
 
 leadRoutes.get('/', leadController.listLeads);
-leadRoutes.get('/:leadId', leadController.getLeadById);
+leadRoutes.get('/:id', leadController.getLeadById);
 leadRoutes.post('/', leadController.createLead);
-leadRoutes.patch('/:leadId', leadController.updateLead);
-leadRoutes.delete('/:leadId', leadController.deleteLead);
+leadRoutes.patch('/:id', leadController.updateLead);
+leadRoutes.delete('/:id', leadController.deleteLead);
 
 export default leadRoutes;

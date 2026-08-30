@@ -1,19 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Kanban,
   Table,
-  Clock,
-  PieChart,
-  Activity,
   Plus,
-  UploadCloud,
-  Sparkles,
-  FileText,
+  RefreshCw,
   Search,
   Building,
   LayoutGrid,
 } from 'lucide-react';
-import { mockClients } from '../../data/mockClients.js';
+import { clientsService } from '../../services/clientsService.js';
 
 export function CRMHeader({
   activeTab,
@@ -23,17 +18,28 @@ export function CRMHeader({
   searchQuery,
   onSearchChange,
   onOpenAddModal,
-  onOpenImportModal,
-  onOpenAIModal,
-  onOpenReportModal,
+  onRefresh,
+  isRefreshing,
 }) {
+  const [clients, setClients] = useState([]);
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const clientList = await clientsService.getClients();
+      setClients(clientList);
+    } catch (e) {
+      console.error('Failed to load clients in CRM header:', e);
+    }
+  };
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'pipeline', label: 'Pipeline Board', icon: Kanban },
     { id: 'leads', label: 'Lead Directory', icon: Table },
-    { id: 'follow-ups', label: 'Follow-ups', icon: Clock },
-    { id: 'sources', label: 'Source Attribution', icon: PieChart },
-    { id: 'activity', label: 'Activity Timeline', icon: Activity },
   ];
 
   return (
@@ -47,101 +53,85 @@ export function CRMHeader({
           </div>
           <h1 className="crm-main-title">Lead Generation & CRM Pipeline Hub</h1>
           <p className="crm-subtitle-text">
-            Capture, score, assign, and convert inbound leads generated across Meta Ads, Google Ads, WhatsApp, Instagram, and Organic Search into closed agency retainer revenue.
+            Capture, score, assign, and convert inbound leads generated across Meta Ads, Google Ads, WhatsApp, and Organic Search directly backed by PostgreSQL.
           </p>
         </div>
 
         <div className="crm-banner-actions">
           <button
             type="button"
-            className="btn-crm-action secondary"
-            onClick={onOpenImportModal}
+            className="btn-saas-secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh database records"
+            aria-label="Refresh database records"
           >
-            <UploadCloud size={15} />
-            <span>Import Leads</span>
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
           <button
             type="button"
-            className="btn-crm-action ai-highlight"
-            onClick={onOpenAIModal}
-          >
-            <Sparkles size={15} />
-            <span>AI Sales Co-Pilot</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-crm-action secondary"
-            onClick={onOpenReportModal}
-          >
-            <FileText size={15} />
-            <span>CRM Report</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-crm-primary"
+            className="btn-add-client-primary"
             onClick={onOpenAddModal}
           >
             <Plus size={16} />
-            <span>New Inbound Lead</span>
+            <span>Add Lead</span>
           </button>
         </div>
       </div>
 
-      {/* Toolbar, Navigation Tabs & Filters */}
-      <div className="crm-toolbar-card">
-        <div className="crm-tabs-row">
-          <div className="crm-nav-tabs" role="tablist">
-            {tabs.map((tab) => {
-              const IconComp = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  className={`crm-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-                  onClick={() => onTabChange(tab.id)}
-                >
-                  <IconComp size={15} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+      {/* Tabs & Client Filter Row */}
+      <div className="crm-nav-controls-row">
+        <div className="crm-tabs-nav-list" role="tablist">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`crm-tab-btn ${isActive ? 'active' : ''}`}
+                onClick={() => onTabChange(tab.id)}
+              >
+                <Icon size={15} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="crm-right-filters-group">
+          {/* Search */}
+          <div className="crm-search-box">
+            <Search size={15} className="crm-search-icon" />
+            <input
+              type="text"
+              placeholder="Search leads by name, company, email..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="crm-search-input"
+            />
           </div>
 
-          <div className="crm-controls-group">
-            {/* Client Filter */}
-            <div className="crm-select-wrapper">
-              <Building size={14} className="icon-muted" />
-              <select
-                value={selectedClient}
-                onChange={(e) => onClientChange(e.target.value)}
-                className="crm-select-field"
-                aria-label="Filter by Client Workspace"
-              >
-                <option value="all">🏢 All Client Accounts</option>
-                {mockClients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Search Box */}
-            <div className="crm-search-field-box">
-              <Search size={14} className="search-icon" />
-              <input
-                type="text"
-                placeholder="Search leads, company, phone, email..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="crm-search-input"
-              />
-            </div>
+          {/* Client Filter */}
+          <div className="crm-client-select-wrapper">
+            <Building size={14} className="crm-filter-icon" />
+            <select
+              value={selectedClient}
+              onChange={(e) => onClientChange(e.target.value)}
+              className="crm-client-select"
+              aria-label="Filter by Client"
+            >
+              <option value="all">All Client Workspaces</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.clientName}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

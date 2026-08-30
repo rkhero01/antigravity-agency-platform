@@ -5,48 +5,31 @@ import {
   LeadPipeline,
   LeadTable,
   LeadDetailModal,
-  LeadScoreModal,
-  FollowUpsTab,
-  ActivityTimeline,
-  SourceAnalytics,
-  AIAssistantModal,
   AddLeadModal,
-  ImportLeadsModal,
-  CRMReportModal,
 } from '../../components/crm/index.js';
 import { crmService } from '../../services/crmService.js';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export function LeadCRMPage({
   activeClient = 'all',
   onNavigate,
 }) {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'pipeline' | 'leads' | 'follow-ups' | 'sources' | 'activity'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'pipeline' | 'leads'
   const [selectedClientFilter, setSelectedClientFilter] = useState(activeClient);
+  const [selectedStageFilter, setSelectedStageFilter] = useState('all');
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Table Filters
-  const [sourceFilter, setSourceFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [staffFilter, setStaffFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
 
   // Datasets
   const [overview, setOverview] = useState({});
   const [leads, setLeads] = useState([]);
-  const [followUps, setFollowUps] = useState([]);
-  const [activities, setActivities] = useState([]);
-  const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   // Modals & Active Selections
   const [selectedLeadForDetail, setSelectedLeadForDetail] = useState(null);
-  const [selectedLeadForScore, setSelectedLeadForScore] = useState(null);
-  const [selectedLeadForAI, setSelectedLeadForAI] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   useEffect(() => {
@@ -66,21 +49,27 @@ export function LeadCRMPage({
     }, 3500);
   };
 
-  const loadAllData = async () => {
-    setLoading(true);
-    const [ov, ld, fu, act, src] = await Promise.all([
-      crmService.getCRMOverview(selectedClientFilter),
-      crmService.getLeads({ clientId: selectedClientFilter }),
-      crmService.getFollowUps(selectedClientFilter),
-      crmService.getActivities(selectedClientFilter),
-      crmService.getSourceAnalytics(selectedClientFilter),
-    ]);
-    setOverview(ov);
-    setLeads(ld);
-    setFollowUps(fu);
-    setActivities(act);
-    setSources(src);
-    setLoading(false);
+  const loadAllData = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setIsRefreshing(true);
+    setError(null);
+
+    try {
+      const [ov, ld] = await Promise.all([
+        crmService.getCRMOverview(selectedClientFilter),
+        crmService.getLeads({ clientId: selectedClientFilter }),
+      ]);
+      setOverview(ov);
+      setLeads(ld);
+    } catch (err) {
+      console.error('Failed to load CRM data from PostgreSQL:', err);
+      setError(
+        err.message || 'Unable to retrieve leads from database. Please check connection and retry.'
+      );
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
   // Filtered Leads
@@ -88,80 +77,74 @@ export function LeadCRMPage({
     return leads.filter((l) => {
       const matchesClient =
         selectedClientFilter === 'all' ? true : l.clientId === selectedClientFilter;
+      const matchesStage =
+        selectedStageFilter === 'all'
+          ? true
+          : (l.stage || '').toUpperCase() === selectedStageFilter.toUpperCase();
       const matchesSource =
-        sourceFilter === 'all' ? true : l.source.toLowerCase() === sourceFilter.toLowerCase();
-      const matchesStatus =
-        statusFilter === 'all' ? true : l.status.toLowerCase() === statusFilter.toLowerCase();
-      const matchesStaff =
-        staffFilter === 'all' ? true : l.assignedStaff.toLowerCase() === staffFilter.toLowerCase();
-      const matchesPriority =
-        priorityFilter === 'all' ? true : l.priority.toLowerCase() === priorityFilter.toLowerCase();
+        selectedSourceFilter === 'all'
+          ? true
+          : (l.source || '').toUpperCase() === selectedSourceFilter.toUpperCase();
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        !searchQuery.trim() ||
-        l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.campaign.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        (l.name || '').toLowerCase().includes(q) ||
+        (l.company || '').toLowerCase().includes(q) ||
+        (l.email || '').toLowerCase().includes(q) ||
+        (l.phone || '').toLowerCase().includes(q) ||
+        (l.clientName || '').toLowerCase().includes(q) ||
+        (l.campaignName || '').toLowerCase().includes(q);
 
-      return matchesClient && matchesSource && matchesStatus && matchesStaff && matchesPriority && matchesSearch;
+      return matchesClient && matchesStage && matchesSource && matchesSearch;
     });
-  }, [leads, selectedClientFilter, sourceFilter, statusFilter, staffFilter, priorityFilter, searchQuery]);
+  }, [leads, selectedClientFilter, selectedStageFilter, selectedSourceFilter, searchQuery]);
 
   // Handlers
   const handleAddLead = async (formData) => {
-    const created = await crmService.addLead(formData);
-    setLeads((prev) => [created, ...prev]);
-    showToast(`✨ Inbound lead "${created.name}" registered & scored!`);
+    const created = await crmService.createLead(formData);
+    await loadAllData(true);
+    showToast(`✨ Inbound lead "${created.name}" registered in CRM pipeline!`);
   };
 
   const handleDeleteLead = async (id) => {
-    await crmService.deleteLead(id);
-    setLeads((prev) => prev.filter((l) => l.id !== id));
-    showToast('Lead removed from CRM pipeline.');
-  };
-
-  const handleMoveStatus = async (id, newStatus) => {
-    await crmService.updateLeadStatus(id, newStatus);
-    setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, status: newStatus, lastActivity: `Moved to ${newStatus} (Just now)` } : l))
+    const target = leads.find((l) => l.id === id);
+    const confirm = window.confirm(
+      `Are you sure you want to archive lead "${target?.name || 'this lead'}"? It will be soft-deleted in PostgreSQL.`
     );
-    showToast(`✓ Lead stage updated to "${newStatus}".`);
+    if (!confirm) return;
+
+    try {
+      await crmService.deleteLead(id);
+      setLeads((prev) => prev.filter((l) => l.id !== id));
+      if (selectedLeadForDetail && selectedLeadForDetail.id === id) {
+        setSelectedLeadForDetail(null);
+      }
+      showToast('Lead archived successfully.');
+    } catch (err) {
+      console.error('Failed to archive lead:', err);
+      alert(err.message || 'Failed to archive lead.');
+    }
   };
 
-  const handleAssignStaff = async (id, staffName) => {
-    await crmService.assignLead(id, staffName);
-    setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, assignedStaff: staffName } : l))
-    );
-    showToast(`✓ Reassigned lead to ${staffName}.`);
-  };
-
-  const handleCompleteFollowUp = async (id) => {
-    await crmService.completeFollowUp(id);
-    setFollowUps((prev) => prev.filter((f) => f.id !== id));
-    showToast('✓ Sales follow-up marked as completed!');
-  };
-
-  const handleRescheduleFollowUp = async (id, newDate) => {
-    await crmService.rescheduleFollowUp(id, newDate);
-    setFollowUps((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, dateTime: newDate, statusCategory: 'Upcoming' } : f))
-    );
-    showToast(`✓ Rescheduled follow-up to ${newDate}.`);
-  };
-
-  const handleOpenLeadById = (leadId) => {
-    const target = leads.find((l) => l.id === leadId);
-    if (target) setSelectedLeadForDetail(target);
+  const handleStatusChange = async (id, newStage) => {
+    try {
+      const updated = await crmService.updateLeadStatus(id, newStage);
+      setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
+      if (selectedLeadForDetail && selectedLeadForDetail.id === id) {
+        setSelectedLeadForDetail(updated);
+      }
+      showToast(`✓ Lead stage moved to "${newStage}".`);
+    } catch (err) {
+      console.error('Failed to update lead stage:', err);
+      alert(err.message || 'Failed to update lead stage.');
+    }
   };
 
   return (
     <div className="crm-command-center-container">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="ai-toast-notification">
+        <div className="ai-toast-notification" role="status">
           <CheckCircle2 size={16} className="text-success" />
           <span>{toastMessage}</span>
         </div>
@@ -176,138 +159,76 @@ export function LeadCRMPage({
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenAddModal={() => setIsAddModalOpen(true)}
-        onOpenImportModal={() => setIsImportModalOpen(true)}
-        onOpenAIModal={() => {
-          setSelectedLeadForAI(null);
-          setIsAIModalOpen(true);
-        }}
-        onOpenReportModal={() => setIsReportModalOpen(true)}
+        onRefresh={() => loadAllData(true)}
+        isRefreshing={isRefreshing}
       />
 
-      {/* 8 KPI Cards */}
+      {/* 7 KPI Metric Cards */}
       <CRMKpiCards overview={overview} />
 
-      {/* Main View Area */}
-      <div className="crm-main-view-area">
-        {activeTab === 'overview' && (
-          <div className="crm-overview-layout">
-            <div className="overview-section-header">
-              <h3 className="section-title-clean">Active Deal Pipeline Overview</h3>
-              <button
-                type="button"
-                className="btn-view-all-sub"
-                onClick={() => setActiveTab('pipeline')}
-              >
-                Open Full Kanban Board →
-              </button>
-            </div>
-            <LeadPipeline
-              leads={filteredLeads}
-              onOpenDetails={setSelectedLeadForDetail}
-              onOpenScoreModal={setSelectedLeadForScore}
-              onMoveStatus={handleMoveStatus}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-            />
+      {/* Main Content Area */}
+      {loading ? (
+        <div className="clients-state-box loading">
+          <div className="clients-loading-spinner" />
+          <p className="clients-state-title">
+            Loading CRM pipeline & inbound leads from PostgreSQL database...
+          </p>
+          <span className="clients-state-sub">
+            Attributing ad channels, deal values & sales qualification stages
+          </span>
+        </div>
+      ) : error ? (
+        <div className="clients-state-box error" role="alert">
+          <div className="state-icon-badge error">
+            <AlertCircle size={28} />
           </div>
-        )}
-
-        {activeTab === 'pipeline' && (
-          <LeadPipeline
-            leads={filteredLeads}
-            onOpenDetails={setSelectedLeadForDetail}
-            onOpenScoreModal={setSelectedLeadForScore}
-            onMoveStatus={handleMoveStatus}
-            onOpenAddModal={() => setIsAddModalOpen(true)}
-          />
-        )}
-
-        {activeTab === 'leads' && (
+          <h3 className="clients-state-title">Database Connection Error</h3>
+          <p className="clients-state-desc">{error}</p>
+          <button
+            type="button"
+            className="btn-saas-primary"
+            onClick={() => loadAllData(false)}
+          >
+            <RefreshCw size={14} />
+            <span>Retry Connection</span>
+          </button>
+        </div>
+      ) : activeTab === 'overview' || activeTab === 'leads' ? (
+        <div className="crm-table-view-section">
           <LeadTable
             leads={filteredLeads}
-            sourceFilter={sourceFilter}
-            onSourceFilterChange={setSourceFilter}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            staffFilter={staffFilter}
-            onStaffFilterChange={setStaffFilter}
-            priorityFilter={priorityFilter}
-            onPriorityFilterChange={setPriorityFilter}
-            onOpenDetails={setSelectedLeadForDetail}
-            onOpenScoreModal={setSelectedLeadForScore}
-            onMoveStatus={handleMoveStatus}
+            onInspectLead={(l) => setSelectedLeadForDetail(l)}
+            onEditLead={(l) => setSelectedLeadForDetail(l)}
             onDeleteLead={handleDeleteLead}
+            onStatusChange={handleStatusChange}
           />
-        )}
+        </div>
+      ) : (
+        <div className="crm-pipeline-board-section">
+          <LeadPipeline
+            leads={filteredLeads}
+            onInspectLead={(l) => setSelectedLeadForDetail(l)}
+            onEditLead={(l) => setSelectedLeadForDetail(l)}
+            onDeleteLead={handleDeleteLead}
+            onStatusChange={handleStatusChange}
+          />
+        </div>
+      )}
 
-        {activeTab === 'follow-ups' && (
-          <FollowUpsTab
-            followUps={followUps}
-            onComplete={handleCompleteFollowUp}
-            onReschedule={handleRescheduleFollowUp}
-            onOpenLead={handleOpenLeadById}
-          />
-        )}
-
-        {activeTab === 'sources' && (
-          <SourceAnalytics
-            sources={sources}
-          />
-        )}
-
-        {activeTab === 'activity' && (
-          <ActivityTimeline
-            activities={activities}
-            onOpenLead={handleOpenLeadById}
-          />
-        )}
-      </div>
+      {/* Add Lead Modal */}
+      <AddLeadModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onCreateLead={handleAddLead}
+      />
 
       {/* Lead Detail Modal */}
       <LeadDetailModal
         lead={selectedLeadForDetail}
         isOpen={Boolean(selectedLeadForDetail)}
         onClose={() => setSelectedLeadForDetail(null)}
-        onUpdateStatus={handleMoveStatus}
-        onAssignStaff={handleAssignStaff}
-      />
-
-      {/* AI Lead Scoring Diagnostics Modal */}
-      <LeadScoreModal
-        lead={selectedLeadForScore}
-        isOpen={Boolean(selectedLeadForScore)}
-        onClose={() => setSelectedLeadForScore(null)}
-        onUpdateScore={(id, updated) => {
-          setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
-        }}
-      />
-
-      {/* AI Sales Co-Pilot Modal */}
-      <AIAssistantModal
-        lead={selectedLeadForAI}
-        isOpen={isAIModalOpen}
-        onClose={() => setIsAIModalOpen(false)}
-        allLeads={leads}
-      />
-
-      {/* Add Lead Modal */}
-      <AddLeadModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAddLead={handleAddLead}
-      />
-
-      {/* Import Leads Modal */}
-      <ImportLeadsModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImportComplete={loadAllData}
-      />
-
-      {/* CRM Executive Report Modal */}
-      <CRMReportModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        selectedClient={selectedClientFilter}
+        onStatusChange={handleStatusChange}
+        onDeleteLead={handleDeleteLead}
       />
     </div>
   );

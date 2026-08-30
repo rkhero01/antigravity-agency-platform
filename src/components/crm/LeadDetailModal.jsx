@@ -1,249 +1,217 @@
 import React, { useState } from 'react';
 import {
   X,
+  User,
+  Building,
+  Target,
+  DollarSign,
   Phone,
   Mail,
-  MessageSquare,
-  Calendar,
-  DollarSign,
+  Trash2,
   CheckCircle2,
-  AlertOctagon,
-  UserCheck,
-  Building,
-  Sparkles,
-  Award,
+  AlertCircle,
+  Clock,
+  Briefcase,
 } from 'lucide-react';
-import { CRM_STAGES } from './LeadPipeline.jsx';
+import { Badge } from '../common/Badge.jsx';
+import { CRM_STAGES } from '../../services/crmService.js';
 
 export function LeadDetailModal({
   lead,
   isOpen,
   onClose,
-  onUpdateStatus,
-  onAssignStaff,
-  onAddNote,
+  onStatusChange,
+  onDeleteLead,
 }) {
-  const [noteText, setNoteText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   if (!isOpen || !lead) return null;
 
-  const showToast = (msg) => {
-    setFeedback(msg);
-    setTimeout(() => {
-      setFeedback(null);
-    }, 2500);
+  const handleDelete = async () => {
+    const confirm = window.confirm(
+      `Are you sure you want to archive lead "${lead.name}"? It will be soft-deleted in PostgreSQL.`
+    );
+    if (!confirm) return;
+
+    setIsDeleting(true);
+    setFeedback(null);
+    try {
+      await onDeleteLead(lead.id);
+      onClose();
+    } catch (err) {
+      setFeedback({ type: 'error', text: err.message || 'Failed to archive lead.' });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const handleNoteSubmit = (e) => {
-    e.preventDefault();
-    if (!noteText.trim()) return;
-    if (onAddNote) onAddNote(lead.id, noteText);
-    showToast('Note added to lead record.');
-    setNoteText('');
+  const handleStageSelect = async (newStage) => {
+    try {
+      await onStatusChange(lead.id, newStage);
+      setFeedback({ type: 'success', text: `Stage updated to ${newStage}` });
+    } catch (err) {
+      setFeedback({ type: 'error', text: err.message || 'Failed to update stage.' });
+    }
   };
+
+  const createdDate = lead.createdAt
+    ? new Date(lead.createdAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : 'Not recorded';
 
   return (
     <div className="modal-backdrop-overlay" onClick={onClose}>
       <div
-        className="modal-dialog-card lead-detail-dialog"
+        className="modal-dialog-card account-detail-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="modal-dialog-header">
-          <div className="flex items-center gap-3">
-            <div className="lead-avatar-big">
-              {lead.name.charAt(0).toUpperCase()}
+          <div className="modal-title-with-icon">
+            <div className="modal-icon-badge">
+              <User size={18} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="modal-title">{lead.name}</h3>
-                <span className="lead-score-pill vip">Score {lead.leadScore} ({lead.scoreCategory})</span>
-              </div>
-              <p className="modal-subtitle">
-                {lead.company} • 🏢 {lead.clientName} • Source: {lead.source}
-              </p>
+              <h3 className="modal-title">{lead.name}</h3>
+              <p className="modal-subtitle">{lead.company || 'Private Contact'}</p>
             </div>
           </div>
-          <button type="button" className="btn-close-modal" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="btn-close-modal"
+            onClick={onClose}
+            aria-label="Close"
+          >
             <X size={18} />
           </button>
         </div>
 
-        {/* Action Bar */}
-        <div className="lead-quick-actions-bar">
-          <a
-            href={`tel:${lead.phone}`}
-            className="btn-quick-touch call"
-            onClick={() => showToast(`Initiating call to ${lead.phone}...`)}
-          >
-            <Phone size={14} />
-            <span>Call Lead</span>
-          </a>
-
-          <a
-            href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
-            target="_blank"
-            rel="noreferrer"
-            className="btn-quick-touch whatsapp"
-            onClick={() => showToast('Opening WhatsApp Chat...')}
-          >
-            <MessageSquare size={14} />
-            <span>WhatsApp</span>
-          </a>
-
-          <a
-            href={`mailto:${lead.email}`}
-            className="btn-quick-touch email"
-            onClick={() => showToast(`Opening email composer for ${lead.email}...`)}
-          >
-            <Mail size={14} />
-            <span>Email</span>
-          </a>
-
-          <button
-            type="button"
-            className="btn-quick-touch won"
-            onClick={() => {
-              onUpdateStatus(lead.id, 'Won');
-              showToast('🎉 Deal marked as Closed Won!');
-            }}
-          >
-            <Award size={14} />
-            <span>Mark Won</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-quick-touch lost"
-            onClick={() => {
-              onUpdateStatus(lead.id, 'Lost');
-              showToast('Deal marked as Lost.');
-            }}
-          >
-            <AlertOctagon size={14} />
-            <span>Mark Lost</span>
-          </button>
-        </div>
-
-        {/* Feedback Alert */}
+        {/* Feedback Banner */}
         {feedback && (
-          <div className="lead-modal-feedback">
-            <CheckCircle2 size={14} className="text-success" />
-            <span>{feedback}</span>
+          <div
+            className={`modal-${feedback.type === 'error' ? 'error' : 'success'}-banner`}
+            role="status"
+          >
+            {feedback.type === 'error' ? (
+              <AlertCircle size={16} className="error-banner-icon" />
+            ) : (
+              <CheckCircle2 size={16} className="success-banner-icon" />
+            )}
+            <span>{feedback.text}</span>
           </div>
         )}
 
-        {/* Modal Body: Split Layout */}
-        <div className="lead-detail-body-grid">
-          {/* Left Column: Contact & Deal Data */}
-          <div className="lead-details-left-pane">
-            <div className="detail-section-card">
-              <h4 className="detail-sec-title">Contact Information</h4>
-              <div className="detail-meta-list">
-                <div className="meta-item">
-                  <span className="meta-lbl">Email:</span>
-                  <span className="meta-val text-white">{lead.email}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-lbl">Phone:</span>
-                  <span className="meta-val text-white">{lead.phone}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-lbl">Company:</span>
-                  <span className="meta-val text-white">{lead.company}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-lbl">Campaign:</span>
-                  <span className="meta-val text-cyan">{lead.campaign}</span>
-                </div>
+        <div className="modal-form-body">
+          {/* Details Grid */}
+          <div className="client-details-grid-spec">
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Assigned Client</span>
+              <strong className="detail-spec-val">{lead.clientName || 'Assigned Client'}</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Current Pipeline Stage</span>
+              <div>
+                <Badge variant={lead.statusVariant || 'primary'}>
+                  {lead.status || lead.stage}
+                </Badge>
               </div>
             </div>
 
-            <div className="detail-section-card">
-              <h4 className="detail-sec-title">Pipeline & Ownership</h4>
-              <div className="detail-meta-list">
-                <div className="meta-item">
-                  <span className="meta-lbl">Deal Value:</span>
-                  <strong className="meta-val text-success">${(lead.value || 0).toLocaleString()}</strong>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-lbl">Pipeline Stage:</span>
-                  <select
-                    value={lead.status}
-                    onChange={(e) => onUpdateStatus(lead.id, e.target.value)}
-                    className="form-select-input-mini"
-                  >
-                    {CRM_STAGES.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-lbl">Assigned Staff:</span>
-                  <select
-                    value={lead.assignedStaff}
-                    onChange={(e) => onAssignStaff(lead.id, e.target.value)}
-                    className="form-select-input-mini"
-                  >
-                    <option value="Elena Rostova">Elena Rostova</option>
-                    <option value="Marcus Chen">Marcus Chen</option>
-                    <option value="Alex Rivera">Alex Rivera</option>
-                    <option value="Sarah Jenkins">Sarah Jenkins</option>
-                    <option value="David Vance">David Vance</option>
-                  </select>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-lbl">Next Follow-up:</span>
-                  <span className="meta-val text-warning">{lead.nextFollowUp}</span>
-                </div>
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Estimated Deal Value</span>
+              <strong className="detail-spec-val text-emerald">
+                ${(lead.value || 0).toLocaleString()}
+              </strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Acquisition Channel</span>
+              <strong className="detail-spec-val">{lead.source}</strong>
+            </div>
+
+            {lead.campaignName && (
+              <div className="detail-spec-item">
+                <span className="detail-spec-label">Campaign Attribution</span>
+                <strong className="detail-spec-val text-cyan">{lead.campaignName}</strong>
               </div>
+            )}
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Lead Qualification Score</span>
+              <strong className="detail-spec-val">{lead.score || 50} / 100</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Sales Owner</span>
+              <strong className="detail-spec-val">{lead.owner || 'Unassigned'}</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Email Address</span>
+              <strong className="detail-spec-val">{lead.email || 'Not provided'}</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Phone Number</span>
+              <strong className="detail-spec-val">{lead.phone || 'Not provided'}</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Captured Date</span>
+              <strong className="detail-spec-val">{createdDate}</strong>
             </div>
           </div>
 
-          {/* Right Column: AI Insights & Notes */}
-          <div className="lead-details-right-pane">
-            <div className="ai-lead-summary-box">
-              <div className="flex items-center gap-2 mb-1.5 text-xs text-primary font-bold">
-                <Sparkles size={14} />
-                <span>AI Intent & Scoring Analysis</span>
-              </div>
-              <p className="text-xs text-white mb-2 leading-relaxed">
-                Lead is flagged as <strong>{lead.scoreCategory} ({lead.leadScore}/100)</strong> based on {lead.scoreReasons?.join(', ')}.
-              </p>
-              <div className="ai-rec-action-chip">
-                <strong>Suggested Next Touch:</strong> Pitch {lead.clientName} customized enterprise tier with 15% annual commitment incentive.
-              </div>
-            </div>
-
-            {/* Notes Section */}
-            <div className="detail-section-card flex-1">
-              <h4 className="detail-sec-title">Sales Notes & History</h4>
-              <p className="lead-saved-notes">{lead.notes}</p>
-
-              <form onSubmit={handleNoteSubmit} className="mt-3">
-                <textarea
-                  rows={2}
-                  placeholder="Add a new follow-up note or call summary..."
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  className="form-textarea-input"
-                />
-                <button type="submit" className="btn-saas-secondary mt-2 w-full justify-center">
-                  Save Note to CRM Timeline
+          {/* Quick Stage Transition */}
+          <div className="detail-scopes-section mt-3">
+            <span className="detail-spec-label">
+              <Briefcase size={13} className="inline-icon" /> Move Opportunity Stage:
+            </span>
+            <div className="client-tags-cloud mt-2">
+              {CRM_STAGES.map((st) => (
+                <button
+                  key={st.value}
+                  type="button"
+                  className={`client-pill-tag clickable ${lead.stage === st.value ? 'active' : ''}`}
+                  onClick={() => handleStageSelect(st.value)}
+                  style={{
+                    cursor: 'pointer',
+                    background: lead.stage === st.value ? `${st.color}30` : undefined,
+                    borderColor: lead.stage === st.value ? st.color : undefined,
+                  }}
+                >
+                  {st.label}
                 </button>
-              </form>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="modal-dialog-footer">
-          <button type="button" className="btn-saas-secondary" onClick={onClose}>
-            Close
-          </button>
+          {/* Modal Actions */}
+          <div className="modal-dialog-footer between mt-4">
+            <button
+              type="button"
+              className="btn-delete-member"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              title="Archive Lead"
+            >
+              <Trash2 size={15} />
+              <span>{isDeleting ? 'Archiving...' : 'Archive Lead'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-saas-secondary"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
