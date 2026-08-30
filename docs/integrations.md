@@ -315,6 +315,36 @@ The retry policy engine (`retryPolicy.js`) deterministically categorizes executi
 - **RBAC**: Operational roles (`OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`) can perform mutations; `VIEWER` and `ANALYST` are strictly read-only (`403 Forbidden`).
 - **Secret Sanitization**: Zero API keys or crawler tokens exposed in API responses or audit logs.
 
+---
+
+## 12. SEO Rank Tracking & Site Audit Engine
+
+### A. Provider Abstraction & Adapters
+- **Common Provider Interface**: `BaseSeoProvider` (`getKeywordRank`, `getKeywordRanks`, `getSearchVisibility`, `getSearchConsoleData`, `healthCheck`).
+- **Google Search Console**: Queries GSC Search Analytics API for `query`, `page`, `clicks`, `impressions`, `ctr`, and `position` with date range querying.
+- **DataForSEO Adapter**: Real-time Google SERP lookup with location-code, language-code, and target domain matching.
+- **Safety Gate**: Unconfigured credentials return `CONFIGURATION_REQUIRED` without fabricating rank data.
+
+### B. Live Endpoints & Historical Snapshots
+- `POST /api/v1/seo/rank-check/:keywordId`: Executes live rank lookup and persists historical snapshot in `AuditLog` (`entityType: 'SEO_KEYWORD_RANK_SNAPSHOT'`).
+- `GET /api/v1/seo/rank-history/:keywordId`: Chronological snapshot history of rank movements, search volumes, impressions, and clicks.
+- `GET /api/v1/seo/providers/status`: Health check across all registered SEO provider adapters.
+
+### C. Safety-First Site Crawler & Technical Heuristics
+- `POST /api/v1/seo/site-audit`: Initiates technical SEO audit on public HTTPS domain.
+- `GET /api/v1/seo/site-audit/history`: Retrieval of recent site audit reports and health scores.
+- **SSRF Guard**: Strict rejection of `localhost`, `127.0.0.1`, RFC1918 private IPs, IPv6 loopback, and cloud metadata endpoints.
+- **Technical Heuristics Diagnosed**:
+  - `MISSING_TITLE` & `SUBOPTIMAL_TITLE_LENGTH`
+  - `MISSING_META_DESCRIPTION`
+  - `MISSING_H1` & `MULTIPLE_H1`
+  - `MISSING_CANONICAL`
+  - `NOINDEX_DETECTED` (CRITICAL)
+  - `MISSING_IMAGE_ALT`
+  - `THIN_CONTENT` (< 300 words)
+- **Health Score Synthesis**: Bounded (0–100) scoring based on severity weights (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
+
+
 
 
 

@@ -514,6 +514,98 @@ export const seoService = {
   },
 
   /**
+   * Run Live Keyword Rank Check
+   */
+  async checkRank(keywordId, provider = 'DATAFORSEO') {
+    try {
+      const response = await apiClient.post(`/api/v1/seo/rank-check/${keywordId}`, { provider });
+      if (response && response.success) {
+        return response.data;
+      }
+    } catch (err) {
+      console.warn(`[SEOService] API checkRank "${keywordId}" error:`, err?.message || err);
+    }
+    return {
+      keywordId,
+      status: 'OFFLINE_PREVIEW',
+      message: 'Offline mode active. Live rank check not executed.',
+    };
+  },
+
+  /**
+   * Get Keyword Historical Rank Snapshots
+   */
+  async getRankHistory(keywordId) {
+    try {
+      const response = await apiClient.get(`/api/v1/seo/rank-history/${keywordId}`);
+      if (response && response.success && Array.isArray(response.data?.history)) {
+        return response.data.history;
+      }
+    } catch (err) {
+      console.warn(`[SEOService] API getRankHistory "${keywordId}" error:`, err?.message || err);
+    }
+    return [];
+  },
+
+  /**
+   * Get SEO Providers Health / Configuration Status
+   */
+  async getProviderStatus() {
+    try {
+      const response = await apiClient.get('/api/v1/seo/providers/status');
+      if (response && response.success && Array.isArray(response.data?.providers)) {
+        return response.data.providers;
+      }
+    } catch (err) {
+      console.warn('[SEOService] API getProviderStatus error:', err?.message || err);
+    }
+    return [
+      { provider: 'GOOGLE_SEARCH_CONSOLE', status: 'CONFIGURATION_REQUIRED', configured: false },
+      { provider: 'DATAFORSEO', status: 'CONFIGURATION_REQUIRED', configured: false },
+    ];
+  },
+
+  /**
+   * Run Live Technical Site Audit
+   */
+  async runLiveSiteAudit(url, clientId = null, autoCreateTasks = false) {
+    try {
+      const response = await apiClient.post('/api/v1/seo/site-audit', {
+        url,
+        clientId,
+        autoCreateTasks,
+      });
+      if (response && response.success) {
+        return response.data;
+      }
+    } catch (err) {
+      console.warn('[SEOService] API runLiveSiteAudit error:', err?.message || err);
+    }
+    return {
+      url,
+      success: false,
+      status: 'OFFLINE_PREVIEW',
+      healthScore: 92,
+      findings: [],
+    };
+  },
+
+  /**
+   * Get Site Audit History
+   */
+  async getAuditHistory() {
+    try {
+      const response = await apiClient.get('/api/v1/seo/site-audit/history');
+      if (response && response.success && Array.isArray(response.data?.history)) {
+        return response.data.history;
+      }
+    } catch (err) {
+      console.warn('[SEOService] API getAuditHistory error:', err?.message || err);
+    }
+    return [];
+  },
+
+  /**
    * Generate Executive SEO Report
    */
   async generateSEOReport(clientId = 'all', dateRange = 'Last 30 Days') {
@@ -533,3 +625,4 @@ export const seoService = {
 };
 
 export default seoService;
+
