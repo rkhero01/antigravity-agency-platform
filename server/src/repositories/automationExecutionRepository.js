@@ -1,10 +1,10 @@
 /**
  * Automation Execution Repository
- * Task 14 — Phase 5: Persistent Execution Tracking & Database-Backed Idempotency
+ * Task 14 — Phase 6 (Task 6 Phase 3): Persistent Execution Tracking, Retry State & Idempotency
  */
 
 import { BaseRepository } from './baseRepository.js';
-import { AuthorizationError } from '../utils/errors.js';
+import { AuthorizationError, NotFoundError } from '../utils/errors.js';
 
 export class AutomationExecutionRepository extends BaseRepository {
   constructor() {
@@ -57,6 +57,10 @@ export class AutomationExecutionRepository extends BaseRepository {
     error = null,
     startedAt = new Date(),
     completedAt = new Date(),
+    attemptCount = 1,
+    failureCategory = null,
+    nextRetryAt = null,
+    retryHistory = [],
   }) {
     if (!agencyId) throw new AuthorizationError('Agency tenant ID is required.');
 
@@ -76,6 +80,10 @@ export class AutomationExecutionRepository extends BaseRepository {
       status: status.toUpperCase(),
       result: result || {},
       error: error ? String(error) : null,
+      attemptCount: attemptCount || 1,
+      failureCategory: failureCategory || null,
+      nextRetryAt: nextRetryAt ? (nextRetryAt instanceof Date ? nextRetryAt.toISOString() : nextRetryAt) : null,
+      retryHistory: retryHistory || [],
       startedAt: startedAt instanceof Date ? startedAt : new Date(startedAt),
       completedAt: completedAt instanceof Date ? completedAt : new Date(completedAt),
       createdAt: new Date(),
@@ -84,6 +92,18 @@ export class AutomationExecutionRepository extends BaseRepository {
     };
 
     return await this.create(payload, agencyId);
+  }
+
+  async updateExecution(id, agencyId, updates = {}) {
+    if (!agencyId) throw new AuthorizationError('Agency tenant ID is required.');
+
+    const existing = await this.findById(id, agencyId);
+    if (!existing) {
+      throw new NotFoundError(`Automation execution "${id}" not found.`);
+    }
+
+    const updated = await this.update(id, updates, agencyId);
+    return updated;
   }
 }
 

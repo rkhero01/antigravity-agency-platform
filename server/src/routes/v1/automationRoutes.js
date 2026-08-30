@@ -16,6 +16,7 @@ automationRoutes.use(tenantScopeMiddleware);
 // Execution History Endpoints (Must be mounted before /:id routes)
 automationRoutes.get('/executions', automationController.listExecutions);
 automationRoutes.get('/executions/:id', automationController.getExecutionById);
+automationRoutes.post('/executions/:id/retry', automationController.retryAutomationExecution);
 
 // Rule Management Endpoints
 automationRoutes.get('/', automationController.listAutomations);

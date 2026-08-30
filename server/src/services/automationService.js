@@ -1,11 +1,12 @@
 /**
  * Automation Service
- * Task 14 — Phase 6: Business Logic & Access Control for Automation Workflows & Action Testing
+ * Task 14 — Phase 6 (Task 6 Phase 3): Business Logic, Access Control, Action Testing & Retry Execution
  */
 
 import { automationRepository } from '../repositories/automationRepository.js';
 import { automationExecutionRepository } from '../repositories/automationExecutionRepository.js';
 import { actionExecutor } from './automation/actionExecutor.js';
+import { retryPolicy, RETRY_CATEGORIES } from './automation/retryPolicy.js';
 import { auditService } from './auditService.js';
 import { NotFoundError, AuthorizationError, ValidationError } from '../utils/errors.js';
 
@@ -134,6 +135,79 @@ export class AutomationService {
       throw new NotFoundError(`Automation execution "${id}" not found.`);
     }
     return execution;
+  }
+
+  async retryExecution(executionId, agencyId, user) {
+    const execution = await this.getExecution(executionId, agencyId);
+
+    if (execution.status === 'SUCCESS') {
+      throw new ValidationError('Cannot retry an execution that has already succeeded.');
+    }
+
+    if (execution.status === 'DUPLICATE') {
+      throw new ValidationError('Cannot retry a duplicate execution.');
+    }
+
+    const currentAttempts = execution.attemptCount || 1;
+    if (currentAttempts >= 5) {
+      throw new ValidationError('Maximum retry attempts (5) exceeded for this execution.');
+    }
+
+    // Lookup original rule
+    let rule = null;
+    if (execution.automationId) {
+      try {
+        rule = await automationRepository.findById(execution.automationId, agencyId);
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    const actionToRun = rule?.actions?.[0] || { type: execution.actionType };
+    const retryResult = await actionExecutor.executeAction(actionToRun, {
+      leadId: execution.leadId,
+      agencyId,
+      eventId: execution.eventId,
+      source: 'MANUAL_RETRY',
+      ruleId: execution.automationId,
+      ruleName: execution.automationName,
+    });
+
+    const newAttempts = currentAttempts + 1;
+    const historyEntry = {
+      attempt: newAttempts,
+      executedAt: new Date().toISOString(),
+      status: retryResult.status,
+      error: retryResult.error || null,
+    };
+
+    const updatedExecution = await automationExecutionRepository.updateExecution(
+      executionId,
+      agencyId,
+      {
+        status: retryResult.status,
+        attemptCount: newAttempts,
+        result: { action: retryResult },
+        error: retryResult.error || null,
+        retryHistory: [...(execution.retryHistory || []), historyEntry],
+        completedAt: new Date(),
+      }
+    );
+
+    await auditService.log({
+      actorId: user.userId,
+      agencyId,
+      action: retryResult.status === 'SUCCESS' ? 'AUTOMATION_RETRY_SUCCEEDED' : 'AUTOMATION_RETRY_FAILED',
+      entityType: 'AUTOMATION_EXECUTION',
+      entityId: executionId,
+      metadata: { attempt: newAttempts, status: retryResult.status },
+    });
+
+    return {
+      success: retryResult.status === 'SUCCESS',
+      status: retryResult.status,
+      execution: updatedExecution,
+    };
   }
 }
 

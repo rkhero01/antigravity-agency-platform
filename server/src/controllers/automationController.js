@@ -1,6 +1,6 @@
 /**
  * Automation Controller
- * Task 14 — Phase 6: REST Endpoints with RBAC for Automation Workflows & Action Testing
+ * Task 14 — Phase 6 (Task 6 Phase 3): REST Endpoints with RBAC for Workflows, Action Testing & Retry Execution
  */
 
 import { automationService } from '../services/automationService.js';
@@ -118,6 +118,17 @@ export async function getExecutionById(req, res, next) {
   }
 }
 
+export async function retryAutomationExecution(req, res, next) {
+  try {
+    checkMutationPermissions(req.user.role);
+    const id = req.params.id || req.params.executionId;
+    const retryResult = await automationService.retryExecution(id, req.agencyId, req.user);
+    return sendSuccess(res, retryResult);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const automationController = {
   listAutomations,
   getAutomationById,
@@ -129,6 +140,7 @@ export const automationController = {
   testAutomationAction,
   listExecutions,
   getExecutionById,
+  retryAutomationExecution,
 };
 
 export default automationController;

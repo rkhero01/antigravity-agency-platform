@@ -225,5 +225,30 @@ The `ssrfGuard` evaluates all outbound URLs prior to dispatch:
 - **Safeguard**: Requires `{ confirmed: true }` in request body.
 - **RBAC**: Only `OWNER`, `ADMIN`, `MANAGER`, `OPERATOR` roles may invoke test actions.
 
+---
+
+## 9. Automation Reliability, Retries & Async Recovery
+
+### A. Deterministic Failure Classification & Retryability
+The retry policy engine (`retryPolicy.js`) deterministically categorizes execution results:
+- **`RATE_LIMITED` (HTTP 429)**: Eligible for bounded exponential retry.
+- **`TEMPORARY_FAILURE` (HTTP 408, 5xx, Network Timeouts, Socket Resets)**: Eligible for bounded exponential retry.
+- **`NEEDS_REAUTH` (HTTP 401/403)**: Non-retryable without administrative token re-authentication.
+- **`FAILED` (HTTP 400, 422, Permanent 4xx)**: Non-retryable validation error.
+- **`CONFIGURATION_REQUIRED`**: Gated until provider credentials are supplied in the environment.
+- **`DUPLICATE`**: Skipped via persistent idempotency check.
+
+### B. Bounded Exponential Backoff
+- **Backoff Formula**: `delay = Math.min(maxDelay, baseDelay * 2^(attempt - 1)) ± jitter`
+- **Defaults**: `maxAttempts: 5`, `baseDelayMs: 1000ms`, `maxDelayMs: 60000ms`.
+- **Retry-After Header**: Automatically parsed and clamped to `maxDelayMs`.
+
+### C. Manual Retry API
+- **Endpoint**: `POST /api/v1/automations/executions/:executionId/retry`
+- **RBAC**: Restricted to `OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`.
+- **Guardrails**: Rejects attempts to retry already `SUCCESS` or `DUPLICATE` records. Maximum attempt cap strictly enforced at 5 attempts.
+- **Audit Trail**: Logs `AUTOMATION_MANUAL_RETRY` and `AUTOMATION_RETRY_SUCCEEDED` / `AUTOMATION_RETRY_FAILED`.
+
+
 
 
