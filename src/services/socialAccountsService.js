@@ -140,9 +140,9 @@ export const socialAccountsService = {
   /**
    * Reconnect / refresh social account credentials
    */
-  async reconnectAccount(id) {
+  async reconnectAccount(id, payload = {}) {
     if (!id) throw new Error('Account ID is required');
-    const response = await apiClient.socialAccounts.reconnect(id);
+    const response = await apiClient.socialAccounts.reconnect(id, payload);
     const raw = response.data?.account || response.data;
     return {
       account: normalizeSocialAccount(raw),
@@ -152,10 +152,19 @@ export const socialAccountsService = {
   },
 
   /**
-   * Alias for reconnectAccount
+   * Synchronize account profile and status using real integrations API
    */
   async syncAccount(id) {
-    return (await this.reconnectAccount(id)).account;
+    if (!id) throw new Error('Account ID is required');
+    try {
+      const response = await apiClient.integrations.sync(id);
+      const raw = response.data?.account || response.data;
+      return normalizeSocialAccount(raw);
+    } catch (err) {
+      const fallback = await apiClient.socialAccounts.reconnect(id);
+      const raw = fallback.data?.account || fallback.data;
+      return normalizeSocialAccount(raw);
+    }
   },
 
   /**

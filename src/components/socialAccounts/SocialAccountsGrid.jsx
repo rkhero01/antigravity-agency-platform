@@ -9,6 +9,7 @@ export function SocialAccountsGrid({
   onInspectAccount,
   onDisconnectAccount,
   onOpenConnectModal,
+  canMutate = true,
 }) {
   if (accounts.length === 0) {
     return (
@@ -20,14 +21,16 @@ export function SocialAccountsGrid({
         <p className="team-empty-desc">
           No social media assets matched your filters. Connect client channels to begin scheduling posts and monitoring engagement.
         </p>
-        <button
-          type="button"
-          className="btn-saas-primary"
-          onClick={onOpenConnectModal}
-        >
-          <PlusCircle size={16} />
-          <span>Connect Social Channel</span>
-        </button>
+        {canMutate && (
+          <button
+            type="button"
+            className="btn-saas-primary"
+            onClick={onOpenConnectModal}
+          >
+            <PlusCircle size={16} />
+            <span>Connect Social Channel</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -42,6 +45,7 @@ export function SocialAccountsGrid({
           onReconnectAccount={onReconnectAccount}
           onInspectAccount={onInspectAccount}
           onDisconnectAccount={onDisconnectAccount}
+          canMutate={canMutate}
         />
       ))}
     </div>

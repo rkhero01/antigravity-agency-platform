@@ -17,6 +17,7 @@ export function SocialAccountCard({
   onReconnectAccount,
   onInspectAccount,
   onDisconnectAccount,
+  canMutate = true,
 }) {
   const isExpired = account.status === 'Needs Re-auth';
   const isExpiringSoon = account.status === 'Expiring Soon';
@@ -33,10 +34,19 @@ export function SocialAccountCard({
         return 'linear-gradient(135deg, #0a66c2, #004182)';
       case 'youtube':
         return 'linear-gradient(135deg, #ff0000, #cc0000)';
+      case 'twitter':
+        return 'linear-gradient(135deg, #1da1f2, #0c85d0)';
       default:
         return 'linear-gradient(135deg, #6366f1, #3b82f6)';
     }
   };
+
+  // Mask platform account ID for safe presentation
+  const maskedAccountId = account.platformAccountId
+    ? account.platformAccountId.length > 8
+      ? `${account.platformAccountId.slice(0, 4)}...${account.platformAccountId.slice(-4)}`
+      : account.platformAccountId
+    : 'N/A';
 
   return (
     <div className={`social-account-card ${isExpired ? 'card-expired' : ''}`}>
@@ -90,23 +100,25 @@ export function SocialAccountCard({
 
           <div className="diag-item">
             <span className="diag-label">
-              <Key size={11} className="inline-icon" /> Scopes Granted
+              <Key size={11} className="inline-icon" /> Account ID
             </span>
-            <strong className="diag-val">{account.scopes?.length || 2} Capabilities</strong>
+            <strong className="diag-val code-font">{maskedAccountId}</strong>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="card-actions-footer">
-          <button
-            type="button"
-            className="btn-sync-action"
-            onClick={() => onReconnectAccount ? onReconnectAccount(account.id) : onSyncAccount(account.id)}
-            title="Refresh Token & State"
-          >
-            <RefreshCw size={13} />
-            <span>Refresh</span>
-          </button>
+          {canMutate && (
+            <button
+              type="button"
+              className="btn-sync-action"
+              onClick={() => onSyncAccount ? onSyncAccount(account.id) : onReconnectAccount(account.id)}
+              title="Sync Profile with Platform"
+            >
+              <RefreshCw size={13} />
+              <span>Sync</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -118,14 +130,16 @@ export function SocialAccountCard({
             <span>Details</span>
           </button>
 
-          <button
-            type="button"
-            className="btn-disconnect-action"
-            onClick={() => onDisconnectAccount(account.id)}
-            title="Disconnect Social Asset"
-          >
-            <Trash2 size={13} />
-          </button>
+          {canMutate && (
+            <button
+              type="button"
+              className="btn-disconnect-action"
+              onClick={() => onDisconnectAccount(account.id)}
+              title="Disconnect Social Asset"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
     </div>

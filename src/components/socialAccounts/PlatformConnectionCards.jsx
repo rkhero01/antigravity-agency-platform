@@ -71,6 +71,7 @@ export function PlatformConnectionCards({
   oauthStatus = {},
   onInitiateConnect,
   isConnecting = false,
+  canMutate = true,
 }) {
   return (
     <div className="platform-connection-grid">
@@ -121,15 +122,21 @@ export function PlatformConnectionCards({
             </div>
 
             <div className="platform-card-footer">
-              <button
-                type="button"
-                className={`btn-connect-platform ${hasActiveAccount ? 'connected-btn' : 'action-btn'}`}
-                onClick={() => onInitiateConnect(spec.platform)}
-                disabled={isConnecting}
-              >
-                <span>{hasActiveAccount ? 'Connect Another' : 'Connect Channel'}</span>
-                <ExternalLink size={14} />
-              </button>
+              {canMutate ? (
+                <button
+                  type="button"
+                  className={`btn-connect-platform ${hasActiveAccount ? 'connected-btn' : 'action-btn'}`}
+                  onClick={() => onInitiateConnect(spec.platform)}
+                  disabled={isConnecting}
+                >
+                  <span>{hasActiveAccount ? 'Connect Another' : 'Connect Channel'}</span>
+                  <ExternalLink size={14} />
+                </button>
+              ) : (
+                <span className="text-muted text-xs font-semibold py-2">
+                  View Only Role
+                </span>
+              )}
             </div>
           </div>
         );

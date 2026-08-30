@@ -253,6 +253,7 @@ export class IntegrationService {
       accountId,
       {
         status: 'DISCONNECTED',
+        deletedAt: new Date(),
         metadataJson: JSON.stringify(meta),
       },
       agencyId

@@ -9,6 +9,7 @@ import {
   AccountDetailModal,
 } from '../../components/socialAccounts/index.js';
 import { socialAccountsService } from '../../services/socialAccountsService.js';
+import { authSessionService } from '../../services/authSessionService.js';
 import { CheckCircle2, AlertCircle, RefreshCw, Share2 } from 'lucide-react';
 
 export function SocialAccountsPage({
@@ -33,6 +34,10 @@ export function SocialAccountsPage({
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [inspectedAccount, setInspectedAccount] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // RBAC Permission Check
+  const currentUser = authSessionService.getCurrentUser();
+  const canMutate = !currentUser || ['OWNER', 'ADMIN', 'MANAGER', 'OPERATOR'].includes((currentUser.role || 'OWNER').toUpperCase());
 
   useEffect(() => {
     loadAccounts();
@@ -108,27 +113,44 @@ export function SocialAccountsPage({
   };
 
   const handleSyncAccount = async (accountId) => {
-    const synced = await socialAccountsService.syncAccount(accountId);
-    setAccounts((prev) => prev.map((a) => (a.id === accountId ? synced : a)));
-    if (inspectedAccount && inspectedAccount.id === accountId) {
-      setInspectedAccount(synced);
+    try {
+      const synced = await socialAccountsService.syncAccount(accountId);
+      setAccounts((prev) => prev.map((a) => (a.id === accountId ? synced : a)));
+      if (inspectedAccount && inspectedAccount.id === accountId) {
+        setInspectedAccount(synced);
+      }
+      showToast('Channel synced successfully with platform.');
+    } catch (err) {
+      showToast(`Sync failed: ${err.message || 'Error communicating with platform.'}`);
     }
-    showToast('Channel synced successfully with platform.');
   };
 
   const handleReconnectAccount = async (accountId) => {
-    const res = await socialAccountsService.reconnectAccount(accountId);
-    await loadAccounts(true);
-    return res;
+    try {
+      const res = await socialAccountsService.reconnectAccount(accountId);
+      await loadAccounts(true);
+      if (res?.authorizationUrl) {
+        window.location.href = res.authorizationUrl;
+      } else {
+        showToast(res.message || 'OAuth authorization refreshed.');
+      }
+      return res;
+    } catch (err) {
+      showToast(`Reconnect failed: ${err.message || 'Error re-authenticating.'}`);
+    }
   };
 
   const handleDisconnectAccount = async (accountId) => {
-    await socialAccountsService.disconnectAccount(accountId);
-    setAccounts((prev) => prev.filter((a) => a.id !== accountId));
-    if (inspectedAccount && inspectedAccount.id === accountId) {
-      setInspectedAccount(null);
+    try {
+      await socialAccountsService.disconnectAccount(accountId);
+      setAccounts((prev) => prev.filter((a) => a.id !== accountId));
+      if (inspectedAccount && inspectedAccount.id === accountId) {
+        setInspectedAccount(null);
+      }
+      showToast('Account disconnected and credentials safely purged.');
+    } catch (err) {
+      showToast(`Disconnect failed: ${err.message || 'Error disconnecting account.'}`);
     }
-    showToast('Account disconnected and credentials safely purged.');
   };
 
   // Filtered Accounts
@@ -194,6 +216,7 @@ export function SocialAccountsPage({
         onOpenConnectModal={() => setIsConnectModalOpen(true)}
         onRefresh={() => loadAccounts(true)}
         isRefreshing={isRefreshing}
+        canMutate={canMutate}
       />
 
       {/* 4 Health KPI Cards */}
@@ -210,6 +233,7 @@ export function SocialAccountsPage({
           oauthStatus={oauthStatus}
           onInitiateConnect={handleInitiatePlatformOAuth}
           isConnecting={isConnectingOAuth}
+          canMutate={canMutate}
         />
       </div>
 
@@ -257,25 +281,34 @@ export function SocialAccountsPage({
                 ? "No social platform channels are currently connected. Choose a platform above to connect your first channel."
                 : 'No accounts match the current filter criteria.'}
             </p>
-            <button
-              type="button"
-              className="btn-saas-primary"
-              onClick={() => setIsConnectModalOpen(true)}
-            >
-              Connect Social Channel
-            </button>
+            {canMutate && (
+              <button
+                type="button"
+                className="btn-saas-primary"
+                onClick={() => setIsConnectModalOpen(true)}
+              >
+                Connect Social Channel
+              </button>
+            )}
           </div>
         ) : viewMode === 'grid' ? (
           <SocialAccountsGrid
             accounts={filteredAccounts}
-            onInspect={(acc) => setInspectedAccount(acc)}
-            onReconnect={handleReconnectAccount}
+            onSyncAccount={handleSyncAccount}
+            onReconnectAccount={handleReconnectAccount}
+            onInspectAccount={(acc) => setInspectedAccount(acc)}
+            onDisconnectAccount={handleDisconnectAccount}
+            onOpenConnectModal={() => setIsConnectModalOpen(true)}
+            canMutate={canMutate}
           />
         ) : (
           <SocialAccountsTable
             accounts={filteredAccounts}
-            onInspect={(acc) => setInspectedAccount(acc)}
-            onReconnect={handleReconnectAccount}
+            onSyncAccount={handleSyncAccount}
+            onReconnectAccount={handleReconnectAccount}
+            onInspectAccount={(acc) => setInspectedAccount(acc)}
+            onDisconnectAccount={handleDisconnectAccount}
+            canMutate={canMutate}
           />
         )}
       </div>
@@ -296,6 +329,7 @@ export function SocialAccountsPage({
         onSync={handleSyncAccount}
         onReconnect={handleReconnectAccount}
         onDisconnect={handleDisconnectAccount}
+        canMutate={canMutate}
       />
     </div>
   );

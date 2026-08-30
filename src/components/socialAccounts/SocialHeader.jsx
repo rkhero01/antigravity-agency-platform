@@ -24,6 +24,7 @@ export function SocialHeader({
   onOpenConnectModal,
   onRefresh,
   isRefreshing,
+  canMutate = true,
 }) {
   const [clients, setClients] = useState([]);
 
@@ -86,14 +87,16 @@ export function SocialHeader({
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
-          <button
-            type="button"
-            className="btn-saas-primary"
-            onClick={onOpenConnectModal}
-          >
-            <PlusCircle size={16} />
-            <span>Connect Channel</span>
-          </button>
+          {canMutate && (
+            <button
+              type="button"
+              className="btn-saas-primary"
+              onClick={onOpenConnectModal}
+            >
+              <PlusCircle size={16} />
+              <span>Connect Channel</span>
+            </button>
+          )}
         </div>
       </div>
 

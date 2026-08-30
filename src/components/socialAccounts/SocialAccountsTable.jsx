@@ -16,6 +16,7 @@ export function SocialAccountsTable({
   onReconnectAccount,
   onInspectAccount,
   onDisconnectAccount,
+  canMutate = true,
 }) {
   return (
     <div className="social-table-card">
@@ -27,7 +28,7 @@ export function SocialAccountsTable({
               <th>Client Workspace</th>
               <th>Connection Status</th>
               <th>Token Health</th>
-              <th>Granted Capabilities</th>
+              <th>Account ID</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -43,12 +44,18 @@ export function SocialAccountsTable({
                 const isExpired = account.status === 'Needs Re-auth';
                 const isExpiringSoon = account.status === 'Expiring Soon';
 
+                const maskedAccountId = account.platformAccountId
+                  ? account.platformAccountId.length > 8
+                    ? `${account.platformAccountId.slice(0, 4)}...${account.platformAccountId.slice(-4)}`
+                    : account.platformAccountId
+                  : 'N/A';
+
                 return (
                   <tr key={account.id} className="social-row-item">
                     {/* Platform & Handle */}
                     <td>
                       <div className="table-platform-cell">
-                        <span className={`table-platform-pill ${account.platform.toLowerCase()}`}>
+                        <span className={`table-platform-pill ${(account.platform || 'meta').toLowerCase()}`}>
                           {account.platform}
                         </span>
                         <div>
@@ -94,24 +101,26 @@ export function SocialAccountsTable({
                       </span>
                     </td>
 
-                    {/* Scopes */}
+                    {/* Masked Account ID */}
                     <td>
-                      <span className="text-muted text-xs">
-                        {account.scopes?.length || 2} Scopes Authorized
+                      <span className="code-font text-xs text-muted">
+                        {maskedAccountId}
                       </span>
                     </td>
 
                     {/* Actions */}
                     <td>
                       <div className="table-actions-cell">
-                        <button
-                          type="button"
-                          className="btn-table-action"
-                          onClick={() => onReconnectAccount ? onReconnectAccount(account.id) : onSyncAccount(account.id)}
-                          title="Refresh Connection State"
-                        >
-                          <RefreshCw size={13} />
-                        </button>
+                        {canMutate && (
+                          <button
+                            type="button"
+                            className="btn-table-action"
+                            onClick={() => onSyncAccount ? onSyncAccount(account.id) : onReconnectAccount(account.id)}
+                            title="Sync Profile with Platform"
+                          >
+                            <RefreshCw size={13} />
+                          </button>
+                        )}
 
                         <button
                           type="button"
@@ -122,14 +131,16 @@ export function SocialAccountsTable({
                           <Shield size={13} />
                         </button>
 
-                        <button
-                          type="button"
-                          className="btn-table-action danger"
-                          onClick={() => onDisconnectAccount(account.id)}
-                          title="Disconnect Channel"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {canMutate && (
+                          <button
+                            type="button"
+                            className="btn-table-action danger"
+                            onClick={() => onDisconnectAccount(account.id)}
+                            title="Disconnect Channel"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

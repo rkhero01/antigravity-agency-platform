@@ -23,6 +23,7 @@ export function AccountDetailModal({
   onSync,
   onReconnect,
   onDisconnect,
+  canMutate = true,
 }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -63,7 +64,7 @@ export function AccountDetailModal({
 
   const handleDisconnect = async () => {
     const confirm = window.confirm(
-      `Disconnecting "${account.accountName}" will stop publishing and synchronization for this channel. Are you sure?`
+      `Disconnecting this account will stop publishing and synchronization for this channel.`
     );
     if (!confirm) return;
 
@@ -194,40 +195,51 @@ export function AccountDetailModal({
 
           {/* Action Buttons */}
           <div className="modal-dialog-footer between mt-4">
-            <button
-              type="button"
-              className="btn-delete-member"
-              onClick={handleDisconnect}
-              disabled={isDisconnecting || isSyncing || isReconnecting}
-              title="Disconnect Account"
-            >
-              <Trash2 size={15} />
-              <span>{isDisconnecting ? 'Disconnecting...' : 'Disconnect Account'}</span>
-            </button>
+            {canMutate ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-delete-member"
+                  onClick={handleDisconnect}
+                  disabled={isDisconnecting || isSyncing || isReconnecting}
+                  title="Disconnect Account"
+                >
+                  <Trash2 size={15} />
+                  <span>{isDisconnecting ? 'Disconnecting...' : 'Disconnect Account'}</span>
+                </button>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="btn-saas-secondary"
-                onClick={handleSync}
-                disabled={isSyncing || isReconnecting || isDisconnecting}
-                title="Sync Profile with Platform"
-              >
-                <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
-              </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-saas-secondary"
+                    onClick={handleSync}
+                    disabled={isSyncing || isReconnecting || isDisconnecting}
+                    title="Sync Profile with Platform"
+                  >
+                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                    <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                  </button>
 
-              <button
-                type="button"
-                className="btn-saas-primary"
-                onClick={handleReconnect}
-                disabled={isReconnecting || isSyncing || isDisconnecting}
-                title="Initiate OAuth Re-authorization"
-              >
-                <Zap size={14} className={isReconnecting ? 'animate-spin' : ''} />
-                <span>{isReconnecting ? 'Initiating...' : 'Reconnect Channel'}</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    className="btn-saas-primary"
+                    onClick={handleReconnect}
+                    disabled={isReconnecting || isSyncing || isDisconnecting}
+                    title="Initiate OAuth Re-authorization"
+                  >
+                    <Zap size={14} className={isReconnecting ? 'animate-spin' : ''} />
+                    <span>{isReconnecting ? 'Initiating...' : 'Reconnect Channel'}</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="w-full flex justify-between items-center text-muted text-sm">
+                <span>View-only mode: mutations disabled for your role.</span>
+                <button type="button" className="btn-saas-secondary" onClick={onClose}>
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
