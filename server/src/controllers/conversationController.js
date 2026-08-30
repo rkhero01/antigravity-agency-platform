@@ -1,6 +1,7 @@
 /**
  * WhatsApp Conversation & Inbox Controller
  * Task 28 — Step 3: WhatsApp Inbox CRUD & Message History
+ * Task 15 — Multi-Tenant Scoped Conversation Engine
  */
 
 import { conversationRepository } from '../repositories/conversationRepository.js';
@@ -10,8 +11,16 @@ import { parsePaginationParams, paginateArray } from '../utils/pagination.js';
 import { validator } from '../utils/validation.js';
 import { sendSuccess } from '../utils/response.js';
 import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
 const ALLOWED_STATUSES = ['OPEN', 'PENDING', 'RESOLVED', 'CLOSED'];
+
+function checkMutationPermissions(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage conversations.');
+  }
+}
 
 export async function listConversations(req, res, next) {
   try {
@@ -78,6 +87,7 @@ export async function getConversationById(req, res, next) {
 
 export async function createConversation(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { clientId, contactId, contactPhone, contactName, channel, assignedTo, tags, initialMessage } = req.body || {};
 
     validator.validateId(clientId, 'clientId');
@@ -135,6 +145,7 @@ export async function createConversation(req, res, next) {
 
 export async function updateConversation(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { conversationId } = req.params;
     validator.validateId(conversationId, 'conversationId');
 
@@ -177,6 +188,7 @@ export async function updateConversation(req, res, next) {
 
 export async function addMessage(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { conversationId } = req.params;
     const { body, direction = 'OUTBOUND', messageType = 'text' } = req.body || {};
 
@@ -205,6 +217,7 @@ export async function addMessage(req, res, next) {
 
 export async function deleteConversation(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { conversationId } = req.params;
     validator.validateId(conversationId, 'conversationId');
 

@@ -249,6 +249,44 @@ The retry policy engine (`retryPolicy.js`) deterministically categorizes executi
 - **Guardrails**: Rejects attempts to retry already `SUCCESS` or `DUPLICATE` records. Maximum attempt cap strictly enforced at 5 attempts.
 - **Audit Trail**: Logs `AUTOMATION_MANUAL_RETRY` and `AUTOMATION_RETRY_SUCCEEDED` / `AUTOMATION_RETRY_FAILED`.
 
+---
+
+## 10. WhatsApp Marketing, Live Omnichannel Inbox & Multi-Tenant Conversation Pipeline
+
+### A. Core Architecture & Endpoints
+- **Conversations & Message Threads**:
+  - `GET /api/v1/whatsapp/conversations`: Multi-tenant filtered conversation listing (`clientId`, `status`, `assignedTo`, `search`).
+  - `GET /api/v1/whatsapp/conversations/:id`: Returns conversation details and full chronological message history (`messages` array).
+  - `POST /api/v1/whatsapp/conversations`: Initiates a new conversation thread with optional inbound message.
+  - `PATCH /api/v1/whatsapp/conversations/:id`: Updates status (`OPEN`, `PENDING`, `RESOLVED`, `CLOSED`), tags, and staff assignment.
+  - `POST /api/v1/whatsapp/conversations/:id/messages`: Appends inbound/outbound messages to thread.
+  - `DELETE /api/v1/whatsapp/conversations/:id`: Soft-deletes and archives conversation.
+
+- **WhatsApp Templates**:
+  - `GET /api/v1/whatsapp/templates`: Lists approved/draft templates with category filtering (`MARKETING`, `UTILITY`, `AUTHENTICATION`).
+  - `POST /api/v1/whatsapp/templates`: Registers template definitions with variable placeholders.
+  - `PATCH /api/v1/whatsapp/templates/:id`: Updates template body and approval status.
+  - `DELETE /api/v1/whatsapp/templates/:id`: Soft-deletes template.
+
+- **WhatsApp Automations**:
+  - `GET /api/v1/whatsapp/automations`: Lists sequence workflows (`triggerType`, `actionType`, `steps`, `delayMinutes`).
+  - `POST /api/v1/whatsapp/automations`: Creates sequence triggers (`KEYWORD_MATCH`, `LEAD_CREATED`, `STATUS_CHANGE`).
+  - `PATCH /api/v1/whatsapp/automations/:id`: Updates sequence configuration or toggles status (`ACTIVE`, `PAUSED`).
+  - `DELETE /api/v1/whatsapp/automations/:id`: Soft-deletes automation sequence.
+
+- **Follow-Up Pipeline**:
+  - `GET /api/v1/whatsapp/follow-ups`: Lists scheduled tasks with priority (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) and channel (`WHATSAPP`, `CALL`, `EMAIL`, `SMS`).
+  - `POST /api/v1/whatsapp/follow-ups`: Schedules follow-up reminders linked to client/lead/conversation.
+  - `PATCH /api/v1/whatsapp/follow-ups/:id`: Transitions status (`PENDING`, `COMPLETED`, `CANCELLED`, `OVERDUE`).
+  - `DELETE /api/v1/whatsapp/follow-ups/:id`: Soft-deletes follow-up task.
+
+### B. Security, RBAC & Secret Protection
+- **Multi-Tenant Isolation**: Enforced via `req.agencyId` and client verification on all database queries.
+- **IDOR Defense**: Access attempts across tenant boundaries return `403 Forbidden` / `404 Not Found`.
+- **RBAC**: Mutations restricted to `OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`. Read-only roles (`VIEWER`, `ANALYST`) are blocked from mutations (`403 Forbidden`).
+- **Secret Sanitization**: Zero access tokens or raw webhook secrets stored in conversation transcripts or audit logs.
+
+
 
 
 

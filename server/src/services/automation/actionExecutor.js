@@ -105,7 +105,7 @@ export class ActionExecutor {
             return {
               type: 'WHATSAPP_SEND',
               status: 'CONFIGURATION_REQUIRED',
-              message: 'Meta WhatsApp Cloud API credentials (META_WA_PHONE_NUMBER_ID / META_WA_ACCESS_TOKEN) are not configured.',
+              message: 'Meta WhatsApp Cloud API credentials (Phone Number ID / Access Token) are not configured.',
               provider: 'META_WHATSAPP_CLOUD',
             };
           }

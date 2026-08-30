@@ -1,6 +1,7 @@
 /**
  * WhatsApp Automation Management Controller
  * Task 28 — Step 3: WhatsApp Automations CRUD
+ * Task 15 — Multi-Tenant Scoped Automation Sequences
  */
 
 import { whatsappAutomationRepository } from '../repositories/whatsappAutomationRepository.js';
@@ -10,8 +11,16 @@ import { parsePaginationParams, paginateArray } from '../utils/pagination.js';
 import { validator } from '../utils/validation.js';
 import { sendSuccess } from '../utils/response.js';
 import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
 const ALLOWED_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED'];
+
+function checkMutationPermissions(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage WhatsApp automations.');
+  }
+}
 
 export async function listAutomations(req, res, next) {
   try {
@@ -62,9 +71,10 @@ export async function getAutomationById(req, res, next) {
 
 export async function createAutomation(req, res, next) {
   try {
-    const { name, description, triggerType, actionType, clientId, steps, delayMinutes = 0, status = 'DRAFT' } = req.body || {};
+    checkMutationPermissions(req.user.role);
+    const { name, description, triggerType, actionType, steps, delayMinutes = 0, conditions, clientId, status = 'ACTIVE' } = req.body || {};
 
-    validator.validateString(name, 'name', 3, 150);
+    validator.validateString(name, 'name', 3, 100);
     const validStatus = validator.validateEnum(status.toUpperCase(), ALLOWED_STATUSES, 'status');
 
     if (clientId) {
@@ -81,8 +91,9 @@ export async function createAutomation(req, res, next) {
       description: description ? String(description).trim() : null,
       triggerType: triggerType ? String(triggerType).trim().toUpperCase() : 'KEYWORD_MATCH',
       actionType: actionType ? String(actionType).trim().toUpperCase() : 'SEND_TEMPLATE',
-      delayMinutes: validator.validateNumber(delayMinutes, 'delayMinutes', 0),
       steps: steps ? (typeof steps === 'string' ? steps : JSON.stringify(steps)) : null,
+      delayMinutes: validator.validateNumber(delayMinutes, 'delayMinutes', 0),
+      conditions: conditions ? (typeof conditions === 'string' ? conditions : JSON.stringify(conditions)) : null,
       status: validStatus,
     });
 
@@ -106,6 +117,7 @@ export async function createAutomation(req, res, next) {
 
 export async function updateAutomation(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { automationId } = req.params;
     validator.validateId(automationId, 'automationId');
 
@@ -114,15 +126,16 @@ export async function updateAutomation(req, res, next) {
       throw new NotFoundError(`WhatsApp Automation with ID "${automationId}" not found.`);
     }
 
-    const { name, description, triggerType, actionType, steps, delayMinutes, status } = req.body || {};
+    const { name, description, triggerType, actionType, steps, delayMinutes, conditions, status } = req.body || {};
     const updates = {};
 
-    if (name !== undefined) updates.name = validator.validateString(name, 'name', 3, 150);
+    if (name !== undefined) updates.name = validator.validateString(name, 'name', 3, 100);
     if (description !== undefined) updates.description = String(description).trim();
     if (triggerType !== undefined) updates.triggerType = String(triggerType).trim().toUpperCase();
     if (actionType !== undefined) updates.actionType = String(actionType).trim().toUpperCase();
-    if (delayMinutes !== undefined) updates.delayMinutes = validator.validateNumber(delayMinutes, 'delayMinutes', 0);
     if (steps !== undefined) updates.steps = typeof steps === 'string' ? steps : JSON.stringify(steps);
+    if (delayMinutes !== undefined) updates.delayMinutes = validator.validateNumber(delayMinutes, 'delayMinutes', 0);
+    if (conditions !== undefined) updates.conditions = typeof conditions === 'string' ? conditions : JSON.stringify(conditions);
     if (status !== undefined) updates.status = validator.validateEnum(status.toUpperCase(), ALLOWED_STATUSES, 'status');
 
     const updated = await whatsappAutomationRepository.update(automationId, updates, req.agencyId);
@@ -147,6 +160,7 @@ export async function updateAutomation(req, res, next) {
 
 export async function deleteAutomation(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { automationId } = req.params;
     validator.validateId(automationId, 'automationId');
 
@@ -156,6 +170,18 @@ export async function deleteAutomation(req, res, next) {
     }
 
     await whatsappAutomationRepository.delete(automationId, req.agencyId, true);
+
+    await auditService.log({
+      actorId: req.user.userId,
+      agencyId: req.agencyId,
+      clientId: existing.clientId,
+      action: AUDIT_ACTIONS.DELETE,
+      entityType: 'WHATSAPP_AUTOMATION',
+      entityId: automationId,
+      before: existing,
+      after: { ...existing, deletedAt: new Date() },
+      requestId: req.id,
+    });
 
     return sendSuccess(res, { message: `WhatsApp Automation "${existing.name}" deleted successfully.` });
   } catch (err) {

@@ -1,6 +1,7 @@
 /**
  * Follow-Up Management Controller
  * Task 28 — Step 3: Follow-Up System CRUD
+ * Task 15 — Multi-Tenant Scoped Follow-Up Pipeline
  */
 
 import { followUpRepository } from '../repositories/followUpRepository.js';
@@ -10,10 +11,18 @@ import { parsePaginationParams, paginateArray } from '../utils/pagination.js';
 import { validator } from '../utils/validation.js';
 import { sendSuccess } from '../utils/response.js';
 import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
 const ALLOWED_STATUSES = ['PENDING', 'COMPLETED', 'CANCELLED', 'OVERDUE'];
 const ALLOWED_CHANNELS = ['WHATSAPP', 'CALL', 'EMAIL', 'SMS', 'OTHER'];
 const ALLOWED_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+function checkMutationPermissions(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage follow-up tasks.');
+  }
+}
 
 export async function listFollowUps(req, res, next) {
   try {
@@ -60,7 +69,7 @@ export async function getFollowUpById(req, res, next) {
       if (existsInOther) {
         throw new AuthorizationError('Tenant isolation violation: Access to external agency follow-up is strictly prohibited.');
       }
-      throw new NotFoundError(`Follow-up with ID "${followUpId}" not found.`);
+      throw new NotFoundError(`FollowUp with ID "${followUpId}" not found.`);
     }
 
     return sendSuccess(res, { followUp });
@@ -71,24 +80,24 @@ export async function getFollowUpById(req, res, next) {
 
 export async function createFollowUp(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { clientId, leadId, contactId, conversationId, assignedTo, contactPhone, scheduledAt, note, channel = 'WHATSAPP', priority = 'MEDIUM' } = req.body || {};
 
     validator.validateId(clientId, 'clientId');
+    const validChannel = validator.validateEnum(channel.toUpperCase(), ALLOWED_CHANNELS, 'channel');
+    const validPriority = validator.validateEnum(priority.toUpperCase(), ALLOWED_PRIORITIES, 'priority');
 
     const client = await clientRepository.findById(clientId, req.agencyId);
     if (!client) {
       throw new AuthorizationError('Tenant isolation violation: Cannot attach follow-up to an external agency client.');
     }
 
-    const validChannel = validator.validateEnum(channel.toUpperCase(), ALLOWED_CHANNELS, 'channel');
-    const validPriority = validator.validateEnum(priority.toUpperCase(), ALLOWED_PRIORITIES, 'priority');
-
     const newFollowUp = await followUpRepository.create({
       agencyId: req.agencyId,
       clientId,
-      leadId: leadId ? String(leadId).trim() : null,
-      contactId: contactId ? String(contactId).trim() : null,
-      conversationId: conversationId ? String(conversationId).trim() : null,
+      leadId: leadId || null,
+      contactId: contactId || null,
+      conversationId: conversationId || null,
       assignedTo: assignedTo ? String(assignedTo).trim() : req.user.name,
       contactPhone: contactPhone ? String(contactPhone).trim() : null,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
@@ -118,23 +127,25 @@ export async function createFollowUp(req, res, next) {
 
 export async function updateFollowUp(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { followUpId } = req.params;
     validator.validateId(followUpId, 'followUpId');
 
     const existing = await followUpRepository.findById(followUpId, req.agencyId);
     if (!existing) {
-      throw new NotFoundError(`Follow-up with ID "${followUpId}" not found.`);
+      throw new NotFoundError(`FollowUp with ID "${followUpId}" not found.`);
     }
 
-    const { status, scheduledAt, note, channel, priority, assignedTo } = req.body || {};
+    const { assignedTo, contactPhone, scheduledAt, note, channel, status, priority } = req.body || {};
     const updates = {};
 
-    if (status !== undefined) updates.status = validator.validateEnum(status.toUpperCase(), ALLOWED_STATUSES, 'status');
+    if (assignedTo !== undefined) updates.assignedTo = String(assignedTo).trim();
+    if (contactPhone !== undefined) updates.contactPhone = String(contactPhone).trim();
     if (scheduledAt !== undefined) updates.scheduledAt = new Date(scheduledAt);
     if (note !== undefined) updates.note = String(note).trim();
     if (channel !== undefined) updates.channel = validator.validateEnum(channel.toUpperCase(), ALLOWED_CHANNELS, 'channel');
+    if (status !== undefined) updates.status = validator.validateEnum(status.toUpperCase(), ALLOWED_STATUSES, 'status');
     if (priority !== undefined) updates.priority = validator.validateEnum(priority.toUpperCase(), ALLOWED_PRIORITIES, 'priority');
-    if (assignedTo !== undefined) updates.assignedTo = String(assignedTo).trim();
 
     const updated = await followUpRepository.update(followUpId, updates, req.agencyId);
 
@@ -158,17 +169,30 @@ export async function updateFollowUp(req, res, next) {
 
 export async function deleteFollowUp(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { followUpId } = req.params;
     validator.validateId(followUpId, 'followUpId');
 
     const existing = await followUpRepository.findById(followUpId, req.agencyId);
     if (!existing) {
-      throw new NotFoundError(`Follow-up with ID "${followUpId}" not found.`);
+      throw new NotFoundError(`FollowUp with ID "${followUpId}" not found.`);
     }
 
     await followUpRepository.delete(followUpId, req.agencyId, true);
 
-    return sendSuccess(res, { message: `Follow-up #${followUpId} deleted successfully.` });
+    await auditService.log({
+      actorId: req.user.userId,
+      agencyId: req.agencyId,
+      clientId: existing.clientId,
+      action: AUDIT_ACTIONS.DELETE,
+      entityType: 'FOLLOW_UP',
+      entityId: followUpId,
+      before: existing,
+      after: { ...existing, deletedAt: new Date() },
+      requestId: req.id,
+    });
+
+    return sendSuccess(res, { message: `FollowUp task with ID "${followUpId}" deleted successfully.` });
   } catch (err) {
     next(err);
   }

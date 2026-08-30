@@ -1,6 +1,7 @@
 /**
  * WhatsApp Template Management Controller
  * Task 28 — Step 3: WhatsApp Templates CRUD
+ * Task 15 — Multi-Tenant Scoped WhatsApp Template Engine
  */
 
 import { whatsappTemplateRepository } from '../repositories/whatsappTemplateRepository.js';
@@ -10,9 +11,17 @@ import { parsePaginationParams, paginateArray } from '../utils/pagination.js';
 import { validator } from '../utils/validation.js';
 import { sendSuccess } from '../utils/response.js';
 import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
 const ALLOWED_CATEGORIES = ['MARKETING', 'UTILITY', 'AUTHENTICATION'];
 const ALLOWED_STATUSES = ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'DISABLED'];
+
+function checkMutationPermissions(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage WhatsApp templates.');
+  }
+}
 
 export async function listTemplates(req, res, next) {
   try {
@@ -67,6 +76,7 @@ export async function getTemplateById(req, res, next) {
 
 export async function createTemplate(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { name, category, language = 'en', body, variables, clientId, status = 'DRAFT' } = req.body || {};
 
     validator.validateString(name, 'name', 3, 100);
@@ -112,6 +122,7 @@ export async function createTemplate(req, res, next) {
 
 export async function updateTemplate(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { templateId } = req.params;
     validator.validateId(templateId, 'templateId');
 
@@ -151,6 +162,7 @@ export async function updateTemplate(req, res, next) {
 
 export async function deleteTemplate(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { templateId } = req.params;
     validator.validateId(templateId, 'templateId');
 
@@ -160,6 +172,18 @@ export async function deleteTemplate(req, res, next) {
     }
 
     await whatsappTemplateRepository.delete(templateId, req.agencyId, true);
+
+    await auditService.log({
+      actorId: req.user.userId,
+      agencyId: req.agencyId,
+      clientId: existing.clientId,
+      action: AUDIT_ACTIONS.DELETE,
+      entityType: 'WHATSAPP_TEMPLATE',
+      entityId: templateId,
+      before: existing,
+      after: { ...existing, deletedAt: new Date() },
+      requestId: req.id,
+    });
 
     return sendSuccess(res, { message: `WhatsApp Template "${existing.name}" deleted successfully.` });
   } catch (err) {
