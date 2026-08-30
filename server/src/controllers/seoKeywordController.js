@@ -1,6 +1,7 @@
 /**
  * SEO Keyword Management Controller
  * Task 28 — Step 3: SEO Keyword CRUD & SERP Calculations
+ * Task 16 — Multi-Tenant Scoped SEO Rank Tracking Engine
  */
 
 import { seoKeywordRepository } from '../repositories/seoKeywordRepository.js';
@@ -11,9 +12,17 @@ import { validator } from '../utils/validation.js';
 import { safeNum } from '../utils/metrics.js';
 import { sendSuccess } from '../utils/response.js';
 import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
 const ALLOWED_STATUSES = ['TRACKING', 'IMPROVING', 'DECLINING', 'ACHIEVED', 'PAUSED'];
 const ALLOWED_INTENTS = ['INFORMATIONAL', 'COMMERCIAL', 'TRANSACTIONAL', 'NAVIGATIONAL'];
+
+function checkMutationPermissions(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage SEO keywords.');
+  }
+}
 
 export async function listKeywords(req, res, next) {
   try {
@@ -80,6 +89,7 @@ export async function getKeywordById(req, res, next) {
 
 export async function createKeyword(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { clientId, keyword, searchVolume = 0, difficulty = 0, currentRank = 100, previousRank = 100, targetRank = 10, url, searchIntent = 'INFORMATIONAL', status = 'TRACKING', notes } = req.body || {};
 
     validator.validateId(clientId, 'clientId');
@@ -133,6 +143,7 @@ export async function createKeyword(req, res, next) {
 
 export async function updateKeyword(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { keywordId } = req.params;
     validator.validateId(keywordId, 'keywordId');
 
@@ -178,6 +189,7 @@ export async function updateKeyword(req, res, next) {
 
 export async function deleteKeyword(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { keywordId } = req.params;
     validator.validateId(keywordId, 'keywordId');
 
@@ -187,6 +199,18 @@ export async function deleteKeyword(req, res, next) {
     }
 
     await seoKeywordRepository.delete(keywordId, req.agencyId, true);
+
+    await auditService.log({
+      actorId: req.user.userId,
+      agencyId: req.agencyId,
+      clientId: existing.clientId,
+      action: AUDIT_ACTIONS.DELETE,
+      entityType: 'SEO_KEYWORD',
+      entityId: keywordId,
+      before: existing,
+      after: { ...existing, deletedAt: new Date() },
+      requestId: req.id,
+    });
 
     return sendSuccess(res, { message: `SEO Keyword "${existing.keyword}" removed successfully.` });
   } catch (err) {

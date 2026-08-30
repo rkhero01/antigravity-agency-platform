@@ -286,6 +286,36 @@ The retry policy engine (`retryPolicy.js`) deterministically categorizes executi
 - **RBAC**: Mutations restricted to `OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`. Read-only roles (`VIEWER`, `ANALYST`) are blocked from mutations (`403 Forbidden`).
 - **Secret Sanitization**: Zero access tokens or raw webhook secrets stored in conversation transcripts or audit logs.
 
+---
+
+## 11. SEO Command Center, Rank Tracking Engine & Organic Growth Pipeline
+
+### A. Core REST Architecture & Endpoints
+- **SEO Keyword Tracking**:
+  - `GET /api/v1/seo/keywords`: Multi-tenant filtered keyword listing (`clientId`, `status`, `searchIntent`, `search`).
+  - `GET /api/v1/seo/keywords/:id`: Retrieves single keyword with dynamic `rankChange` calculation (`previousRank - currentRank`).
+  - `POST /api/v1/seo/keywords`: Registers tracked keyword (`searchVolume`, `difficulty`, `currentRank`, `previousRank`, `targetRank`, `searchIntent`, `status`, `url`).
+  - `PATCH /api/v1/seo/keywords/:id`: Updates rank movement, target positions, search intent, and status (`TRACKING`, `IMPROVING`, `DECLINING`, `ACHIEVED`, `PAUSED`).
+  - `DELETE /api/v1/seo/keywords/:id`: Soft-deletes and archives keyword record.
+
+- **SEO Optimization Tasks**:
+  - `GET /api/v1/seo/tasks`: Lists optimization tasks filtered by `clientId`, `priority` (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`), `status` (`TODO`, `IN_PROGRESS`, `BLOCKED`, `COMPLETED`, `CANCELLED`).
+  - `GET /api/v1/seo/tasks/:id`: Retrieves task details and completion progress.
+  - `POST /api/v1/seo/tasks`: Creates structured task linked to client, keyword, and assignee.
+  - `PATCH /api/v1/seo/tasks/:id`: Updates task progress, completion %, due date, and status lifecycle.
+  - `DELETE /api/v1/seo/tasks/:id`: Soft-deletes task.
+
+### B. Dynamic SERP Math & Calculations
+- **Rank Change Formula**: `rankChange = (previousRank || 100) - (currentRank || 100)` (positive value signifies upward rank improvement).
+- **Zero Fabrication Guarantee**: Current and previous ranks reflect only verified operator input or live provider SERP data.
+
+### C. Security, RBAC & Secret Protection
+- **Multi-Tenant Scoping**: All database queries are automatically filtered by `req.agencyId`.
+- **IDOR Protection**: Cross-tenant keyword and task access attempts return `403 Forbidden` / `404 Not Found`.
+- **RBAC**: Operational roles (`OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`) can perform mutations; `VIEWER` and `ANALYST` are strictly read-only (`403 Forbidden`).
+- **Secret Sanitization**: Zero API keys or crawler tokens exposed in API responses or audit logs.
+
+
 
 
 

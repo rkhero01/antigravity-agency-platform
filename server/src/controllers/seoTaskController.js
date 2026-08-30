@@ -1,6 +1,7 @@
 /**
  * SEO Task Management Controller
  * Task 28 — Step 3: SEO Task CRUD
+ * Task 16 — Multi-Tenant Scoped SEO Optimization Task Pipeline
  */
 
 import { seoTaskRepository } from '../repositories/seoTaskRepository.js';
@@ -10,9 +11,17 @@ import { parsePaginationParams, paginateArray } from '../utils/pagination.js';
 import { validator } from '../utils/validation.js';
 import { sendSuccess } from '../utils/response.js';
 import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { ROLES } from '../middleware/auth.js';
 
 const ALLOWED_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const ALLOWED_STATUSES = ['TODO', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELLED'];
+
+function checkMutationPermissions(role) {
+  const allowed = [ROLES.OWNER, ROLES.ADMIN, ROLES.MANAGER, ROLES.OPERATOR];
+  if (!allowed.includes(role)) {
+    throw new AuthorizationError('Insufficient privileges: Operational role required to manage SEO tasks.');
+  }
+}
 
 export async function listTasks(req, res, next) {
   try {
@@ -71,6 +80,7 @@ export async function getTaskById(req, res, next) {
 
 export async function createTask(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { clientId, keywordId, title, description, assignedTo, priority = 'MEDIUM', dueDate, status = 'TODO', completion = 0, notes } = req.body || {};
 
     validator.validateId(clientId, 'clientId');
@@ -118,6 +128,7 @@ export async function createTask(req, res, next) {
 
 export async function updateTask(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { taskId } = req.params;
     validator.validateId(taskId, 'taskId');
 
@@ -160,6 +171,7 @@ export async function updateTask(req, res, next) {
 
 export async function deleteTask(req, res, next) {
   try {
+    checkMutationPermissions(req.user.role);
     const { taskId } = req.params;
     validator.validateId(taskId, 'taskId');
 
@@ -169,6 +181,18 @@ export async function deleteTask(req, res, next) {
     }
 
     await seoTaskRepository.delete(taskId, req.agencyId, true);
+
+    await auditService.log({
+      actorId: req.user.userId,
+      agencyId: req.agencyId,
+      clientId: existing.clientId,
+      action: AUDIT_ACTIONS.DELETE,
+      entityType: 'SEO_TASK',
+      entityId: taskId,
+      before: existing,
+      after: { ...existing, deletedAt: new Date() },
+      requestId: req.id,
+    });
 
     return sendSuccess(res, { message: `SEO Task "${existing.title}" removed successfully.` });
   } catch (err) {
