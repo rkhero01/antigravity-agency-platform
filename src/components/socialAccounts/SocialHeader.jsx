@@ -6,7 +6,7 @@ import {
   LayoutGrid,
   List,
   RefreshCw,
-  SlidersHorizontal,
+  Building,
 } from 'lucide-react';
 import { clientsService } from '../../services/clientsService.js';
 
@@ -48,6 +48,14 @@ export function SocialHeader({
     { value: 'GOOGLE_BUSINESS', label: 'Google Business Profile' },
     { value: 'YOUTUBE', label: 'YouTube Channels' },
     { value: 'LINKEDIN', label: 'LinkedIn Company' },
+    { value: 'TWITTER', label: 'X (Twitter)' },
+  ];
+
+  const statusesList = [
+    { value: 'all', label: 'All Statuses' },
+    { value: 'ACTIVE', label: 'Active / Connected' },
+    { value: 'NEEDS_REAUTH', label: 'Needs Re-auth' },
+    { value: 'DISCONNECTED', label: 'Disconnected' },
   ];
 
   return (
@@ -57,15 +65,15 @@ export function SocialHeader({
         <div className="social-title-box">
           <div className="social-badge">
             <Share2 size={14} />
-            <span>Multi-Tenant Channel Access & OAuth Gateway</span>
+            <span>Connection Center</span>
           </div>
-          <h1 className="social-main-title">Social Accounts & Platform Connections</h1>
+          <h1 className="social-main-title">Social Accounts</h1>
           <p className="social-subtext">
-            Manage authenticated social media channel assets, page tokens, and publishing permissions bound to client workspaces.
+            Connect and manage your clients' social media channels.
           </p>
         </div>
 
-        <div className="social-header-actions">
+        <div className="social-top-actions">
           <button
             type="button"
             className="btn-saas-secondary"
@@ -80,98 +88,103 @@ export function SocialHeader({
 
           <button
             type="button"
-            className="btn-add-client-primary"
+            className="btn-saas-primary"
             onClick={onOpenConnectModal}
           >
             <PlusCircle size={16} />
-            <span>Connect Channel Asset</span>
+            <span>Connect Channel</span>
           </button>
         </div>
       </div>
 
-      {/* Toolbar & Filters */}
-      <div className="team-toolbar-row">
-        {/* Search */}
-        <div className="team-search-wrapper">
-          <Search size={16} className="search-icon-muted" />
-          <input
-            type="text"
-            placeholder="Search by channel, handle, or client workspace..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="team-search-input"
-          />
+      {/* Filter Row: Client Workspace, Platform, Status, Search, View Switcher */}
+      <div className="social-controls-row">
+        <div className="social-left-filters">
+          {/* Client Selector */}
+          <div className="social-filter-select-wrapper">
+            <Building size={14} className="filter-inline-icon" />
+            <select
+              value={selectedClient}
+              onChange={(e) => onClientChange(e.target.value)}
+              className="social-select-input"
+              aria-label="Filter by Client Workspace"
+            >
+              <option value="all">All Clients</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.clientName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Platform Filter */}
+          <div className="social-filter-select-wrapper">
+            <select
+              value={selectedPlatform}
+              onChange={(e) => onPlatformChange(e.target.value)}
+              className="social-select-input"
+              aria-label="Filter by Platform"
+            >
+              {platformsList.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="social-filter-select-wrapper">
+            <select
+              value={selectedStatus}
+              onChange={(e) => onStatusChange(e.target.value)}
+              className="social-select-input"
+              aria-label="Filter by Status"
+            >
+              {statusesList.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Client Filter */}
-        <div className="team-filter-select-wrapper">
-          <select
-            value={selectedClient}
-            onChange={(e) => onClientChange(e.target.value)}
-            className="team-filter-select"
-            aria-label="Filter by Client"
-          >
-            <option value="all">All Client Workspaces</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name || c.clientName}
-              </option>
-            ))}
-          </select>
-        </div>
+        <div className="social-right-controls">
+          {/* Search Input */}
+          <div className="social-search-wrapper">
+            <Search size={14} className="social-search-icon" />
+            <input
+              type="text"
+              placeholder="Search channels, handles..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="social-search-input"
+            />
+          </div>
 
-        {/* Platform Filter */}
-        <div className="team-filter-select-wrapper">
-          <select
-            value={selectedPlatform}
-            onChange={(e) => onPlatformChange(e.target.value)}
-            className="team-filter-select"
-            aria-label="Filter by Platform"
-          >
-            {platformsList.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div className="team-filter-select-wrapper">
-          <select
-            value={selectedStatus}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className="team-filter-select"
-            aria-label="Filter by Status"
-          >
-            <option value="all">All Statuses</option>
-            <option value="Active">Active & Healthy</option>
-            <option value="Needs Re-auth">Needs Re-auth</option>
-            <option value="Expiring Soon">Expiring Soon</option>
-            <option value="Disconnected">Disconnected</option>
-          </select>
-        </div>
-
-        {/* View Toggle */}
-        <div className="team-view-toggle-group">
-          <button
-            type="button"
-            className={`team-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-            onClick={() => onViewModeChange('grid')}
-            title="Grid View"
-          >
-            <LayoutGrid size={15} />
-            <span>Cards</span>
-          </button>
-          <button
-            type="button"
-            className={`team-view-btn ${viewMode === 'table' ? 'active' : ''}`}
-            onClick={() => onViewModeChange('table')}
-            title="Table View"
-          >
-            <List size={15} />
-            <span>Table</span>
-          </button>
+          {/* View Toggle */}
+          <div className="social-view-mode-toggle" role="group" aria-label="View Mode">
+            <button
+              type="button"
+              className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => onViewModeChange('grid')}
+              title="Grid View"
+            >
+              <LayoutGrid size={15} />
+              <span>Grid</span>
+            </button>
+            <button
+              type="button"
+              className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+              onClick={() => onViewModeChange('table')}
+              title="Table View"
+            >
+              <List size={15} />
+              <span>Table</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

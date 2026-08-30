@@ -6,7 +6,7 @@ The Antigravity Agency Platform connects multi-tenant marketing workspaces to ex
 
 ```mermaid
 flowchart LR
-    ClientApp["Frontend UI"] -->|1. Connect Request| BackendAPI["Backend REST Gateway (/api/v1/integrations)"]
+    ClientApp["Frontend Connection Hub"] -->|1. Connect Request| BackendAPI["Backend REST Gateway (/api/v1/integrations)"]
     BackendAPI -->|2. Generate CSRF State| StateStore["OAuth State Store (10m TTL)"]
     BackendAPI -->|3. Redirect URL| Provider["External Provider (Meta / Google / LinkedIn / X)"]
     Provider -->|4. Auth Code + State| CallbackHandler["Callback Handler (/integrations/:provider/callback)"]
@@ -84,3 +84,39 @@ flowchart LR
    - Account attachments are strictly validated against `req.agencyId`. Cross-agency account linking attempts are rejected with `403 Forbidden` / `404 Not Found`.
 4. **Configuration Gating & Zero Fabricated Data**:
    - When OAuth application credentials or access tokens are missing or expired, endpoints return `CONFIGURATION_REQUIRED` or `REAUTH_REQUIRED`. The platform never fabricates fake external tokens, dummy post IDs, or false publishing confirmations.
+
+---
+
+## 4. User Connection & Lifecycle Workflows
+
+### A. Initial Connection Workflow
+1. Navigate to **Social Accounts** from the agency dashboard navigation.
+2. Select target client workspace filter (or keep "All Clients").
+3. In the **Platform Connection Hub**, click **Connect Channel** on your desired provider card.
+4. If provider credentials are configured, the browser redirects to the external provider login and authorization screen.
+5. Upon authorizing, the callback handler verifies the single-use CSRF token, exchanges the authorization code for tokens, discovers connected pages/identities, encrypts tokens, and registers the account in PostgreSQL.
+6. If provider credentials are not yet configured, the system displays a clear diagnostic notice: `CONFIGURATION_REQUIRED`.
+
+### B. Synchronization Workflow ("Sync Now")
+1. Click **Inspect** on any connected account card.
+2. Click **Sync Now** to trigger `POST /api/v1/integrations/:id/sync`.
+3. The server decrypts the token, checks freshness, fetches the latest platform metadata, and updates PostgreSQL.
+
+### C. Reconnect Procedure ("Reconnect")
+1. When token expires or status changes to `NEEDS_REAUTH`, click **Reconnect Channel**.
+2. The server initiates a new OAuth handshake (`POST /api/v1/integrations/:id/reconnect`).
+3. Re-authorization updates the encrypted credentials and resets status to `ACTIVE`.
+
+### D. Disconnect Procedure ("Disconnect")
+1. In the account detail modal, click **Disconnect Account**.
+2. Confirm the safety warning dialog.
+3. The server revokes the external token where supported, purges all encrypted tokens from PostgreSQL metadata, marks status as `DISCONNECTED`, and records an audit trail.
+
+---
+
+## 5. Troubleshooting & Health Indicators
+
+- **`ACTIVE` (Healthy)**: Token valid, channel operational for publishing and analytics.
+- **`NEEDS_REAUTH` (Action Required)**: Token expired or permission revoked by channel administrator. Click **Reconnect** to re-authorize.
+- **`DISCONNECTED` (Archived)**: Account unlinked, encrypted credentials purged from database.
+- **`CONFIGURATION_REQUIRED` (DevOps Setup)**: Missing provider App ID / Secret in hosting environment variables.

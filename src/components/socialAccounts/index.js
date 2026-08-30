@@ -1,5 +1,6 @@
 export { SocialHeader } from './SocialHeader.jsx';
 export { SocialHealthKpiCards } from './SocialHealthKpiCards.jsx';
+export { PlatformConnectionCards } from './PlatformConnectionCards.jsx';
 export { SocialAccountsGrid } from './SocialAccountsGrid.jsx';
 export { SocialAccountsTable } from './SocialAccountsTable.jsx';
 export { SocialAccountCard } from './SocialAccountCard.jsx';

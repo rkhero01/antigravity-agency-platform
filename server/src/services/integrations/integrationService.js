@@ -26,6 +26,13 @@ export class IntegrationService {
     if (!agencyId) throw new AuthorizationError('Tenant agency ID is required.');
     if (!user) throw new AuthorizationError('Authenticated user is required.');
 
+    if (clientId && clientId !== 'all') {
+      const client = await clientRepository.findById(clientId, agencyId);
+      if (!client) {
+        throw new NotFoundError(`Client workspace "${clientId}" not found in this agency.`);
+      }
+    }
+
     const provider = getOAuthProvider(providerName);
     if (!provider.isConfigured()) {
       return {
@@ -35,13 +42,6 @@ export class IntegrationService {
         message: `OAuth credentials for "${provider.name}" are not configured in environment variables.`,
         requiresSetup: true,
       };
-    }
-
-    if (clientId && clientId !== 'all') {
-      const client = await clientRepository.findById(clientId, agencyId);
-      if (!client) {
-        throw new NotFoundError(`Client workspace "${clientId}" not found in this agency.`);
-      }
     }
 
     // Generate single-use CSRF-safe state token

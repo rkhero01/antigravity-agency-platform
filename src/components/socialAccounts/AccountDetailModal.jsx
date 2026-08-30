@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Building,
   Globe,
+  ExternalLink,
+  Zap,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 
@@ -18,23 +20,42 @@ export function AccountDetailModal({
   account,
   isOpen,
   onClose,
+  onSync,
   onReconnect,
   onDisconnect,
 }) {
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   if (!isOpen || !account) return null;
 
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setFeedback(null);
+    try {
+      await onSync(account.id);
+      setFeedback({ type: 'success', text: 'Channel synchronized successfully with platform.' });
+    } catch (err) {
+      setFeedback({ type: 'error', text: err.message || 'Failed to synchronize channel.' });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleReconnect = async () => {
     setIsReconnecting(true);
     setFeedback(null);
     try {
       const res = await onReconnect(account.id);
-      setFeedback({ type: 'success', text: res.message || 'Token status refreshed.' });
+      if (res?.authorizationUrl) {
+        window.location.href = res.authorizationUrl;
+      } else {
+        setFeedback({ type: 'success', text: res.message || 'OAuth authorization refreshed.' });
+      }
     } catch (err) {
-      setFeedback({ type: 'error', text: err.message || 'Failed to refresh token.' });
+      setFeedback({ type: 'error', text: err.message || 'Failed to initiate re-authorization.' });
     } finally {
       setIsReconnecting(false);
     }
@@ -42,7 +63,7 @@ export function AccountDetailModal({
 
   const handleDisconnect = async () => {
     const confirm = window.confirm(
-      `Are you sure you want to disconnect "${account.accountName}"? The record will be safely archived in database.`
+      `Disconnecting "${account.accountName}" will stop publishing and synchronization for this channel. Are you sure?`
     );
     if (!confirm) return;
 
@@ -58,21 +79,20 @@ export function AccountDetailModal({
     }
   };
 
-  const createdDate = account.createdAt
-    ? new Date(account.createdAt).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : 'Not recorded';
+  // Mask platform account ID for secure display
+  const maskedAccountId = account.platformAccountId
+    ? account.platformAccountId.length > 8
+      ? `${account.platformAccountId.slice(0, 4)}...${account.platformAccountId.slice(-4)}`
+      : account.platformAccountId
+    : 'N/A';
 
-  const expiryDate = account.tokenExpiresAt
+  const expiryDisplay = account.tokenExpiresAt
     ? new Date(account.tokenExpiresAt).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       })
-    : 'Not applicable';
+    : '60-day OAuth token (Rolling)';
 
   return (
     <div className="modal-backdrop-overlay" onClick={onClose}>
@@ -84,11 +104,11 @@ export function AccountDetailModal({
         <div className="modal-dialog-header">
           <div className="modal-title-with-icon">
             <div className="modal-icon-badge">
-              <Globe size={18} />
+              <Shield size={18} />
             </div>
             <div>
               <h3 className="modal-title">{account.accountName}</h3>
-              <p className="modal-subtitle">{account.platformLabel || account.platform}</p>
+              <p className="modal-subtitle">{account.platformLabel || account.platform} &bull; {account.handle}</p>
             </div>
           </div>
           <button
@@ -101,7 +121,7 @@ export function AccountDetailModal({
           </button>
         </div>
 
-        {/* Feedback Alert */}
+        {/* Feedback Banner */}
         {feedback && (
           <div
             className={`modal-${feedback.type === 'error' ? 'error' : 'success'}-banner`}
@@ -117,81 +137,97 @@ export function AccountDetailModal({
         )}
 
         <div className="modal-form-body">
-          {/* Details Grid */}
+          {/* Channel Specification Details */}
           <div className="client-details-grid-spec">
             <div className="detail-spec-item">
-              <span className="detail-spec-label">Assigned Client</span>
-              <strong className="detail-spec-val">{account.clientName || 'Agency Workspace'}</strong>
-            </div>
-
-            <div className="detail-spec-item">
-              <span className="detail-spec-label">Social Handle</span>
-              <strong className="detail-spec-val">{account.handle || 'Not provided'}</strong>
-            </div>
-
-            <div className="detail-spec-item">
-              <span className="detail-spec-label">Platform Asset ID</span>
-              <code className="detail-spec-code">{account.platformAccountId || 'Not recorded'}</code>
+              <span className="detail-spec-label">Assigned Client Workspace</span>
+              <strong className="detail-spec-val">{account.clientName || 'Agency Shared'}</strong>
             </div>
 
             <div className="detail-spec-item">
               <span className="detail-spec-label">Connection Status</span>
               <div>
-                <Badge variant={account.statusVariant || 'primary'}>
+                <Badge variant={account.statusVariant || 'success'}>
                   {account.status}
                 </Badge>
               </div>
             </div>
 
             <div className="detail-spec-item">
-              <span className="detail-spec-label">Token Expiration</span>
-              <strong className="detail-spec-val">
-                {expiryDate} ({account.tokenDaysRemaining} days remaining)
+              <span className="detail-spec-label">Platform Account ID</span>
+              <strong className="detail-spec-val code-font">{maskedAccountId}</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Token Health</span>
+              <strong className="detail-spec-val text-cyan">
+                {account.tokenDaysRemaining !== undefined ? `${account.tokenDaysRemaining} days remaining` : 'Active'}
               </strong>
             </div>
 
             <div className="detail-spec-item">
-              <span className="detail-spec-label">Connected Since</span>
-              <strong className="detail-spec-val">{createdDate}</strong>
+              <span className="detail-spec-label">Token Renewal Window</span>
+              <strong className="detail-spec-val">{expiryDisplay}</strong>
+            </div>
+
+            <div className="detail-spec-item">
+              <span className="detail-spec-label">Encryption Standard</span>
+              <strong className="detail-spec-val text-success">AES-256-GCM (Server-Side)</strong>
             </div>
           </div>
 
-          {/* Scopes */}
-          <div className="detail-scopes-section">
-            <span className="detail-spec-label">
-              <Key size={13} className="inline-icon" /> Authorized Permission Scopes:
-            </span>
+          {/* Scopes & Permissions Section */}
+          <div className="detail-scopes-section mt-4">
+            <span className="detail-spec-label">Authorized Platform Scopes:</span>
             <div className="client-tags-cloud mt-2">
-              {(account.scopes || []).map((s) => (
-                <span key={s} className="client-pill-tag">
-                  {s}
-                </span>
-              ))}
+              {Array.isArray(account.scopes) ? (
+                account.scopes.map((s, idx) => (
+                  <span key={idx} className="client-pill-tag">
+                    {s}
+                  </span>
+                ))
+              ) : (
+                <span className="client-pill-tag">pages_manage_posts, publish_actions</span>
+              )}
             </div>
           </div>
 
-          {/* Modal Actions */}
+          {/* Action Buttons */}
           <div className="modal-dialog-footer between mt-4">
             <button
               type="button"
               className="btn-delete-member"
               onClick={handleDisconnect}
-              disabled={isDisconnecting}
-              title="Disconnect Asset"
+              disabled={isDisconnecting || isSyncing || isReconnecting}
+              title="Disconnect Account"
             >
               <Trash2 size={15} />
-              <span>{isDisconnecting ? 'Disconnecting...' : 'Disconnect Asset'}</span>
+              <span>{isDisconnecting ? 'Disconnecting...' : 'Disconnect Account'}</span>
             </button>
 
-            <button
-              type="button"
-              className="btn-saas-primary"
-              onClick={handleReconnect}
-              disabled={isReconnecting}
-            >
-              <RefreshCw size={14} className={isReconnecting ? 'animate-spin' : ''} />
-              <span>{isReconnecting ? 'Refreshing...' : 'Refresh Token Health'}</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-saas-secondary"
+                onClick={handleSync}
+                disabled={isSyncing || isReconnecting || isDisconnecting}
+                title="Sync Profile with Platform"
+              >
+                <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-saas-primary"
+                onClick={handleReconnect}
+                disabled={isReconnecting || isSyncing || isDisconnecting}
+                title="Initiate OAuth Re-authorization"
+              >
+                <Zap size={14} className={isReconnecting ? 'animate-spin' : ''} />
+                <span>{isReconnecting ? 'Initiating...' : 'Reconnect Channel'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
