@@ -1,6 +1,6 @@
 /**
  * Automation Controller
- * Task 14 — Phase 5: REST Endpoints with RBAC for Automation Workflows & Execution History
+ * Task 14 — Phase 6: REST Endpoints with RBAC for Automation Workflows & Action Testing
  */
 
 import { automationService } from '../services/automationService.js';
@@ -88,6 +88,17 @@ export async function deleteAutomation(req, res, next) {
   }
 }
 
+export async function testAutomationAction(req, res, next) {
+  try {
+    checkMutationPermissions(req.user.role);
+    const id = req.params.id || req.params.automationId;
+    const testResult = await automationService.testAction(id, req.body, req.agencyId, req.user);
+    return sendSuccess(res, testResult);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listExecutions(req, res, next) {
   try {
     const executions = await automationService.listExecutions(req.agencyId, req.query);
@@ -115,6 +126,7 @@ export const automationController = {
   enableAutomation,
   disableAutomation,
   deleteAutomation,
+  testAutomationAction,
   listExecutions,
   getExecutionById,
 };

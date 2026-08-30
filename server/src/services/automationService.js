@@ -1,12 +1,13 @@
 /**
  * Automation Service
- * Task 14 — Phase 5: Business Logic & Access Control for Automation Workflows
+ * Task 14 — Phase 6: Business Logic & Access Control for Automation Workflows & Action Testing
  */
 
 import { automationRepository } from '../repositories/automationRepository.js';
 import { automationExecutionRepository } from '../repositories/automationExecutionRepository.js';
+import { actionExecutor } from './automation/actionExecutor.js';
 import { auditService } from './auditService.js';
-import { NotFoundError, AuthorizationError } from '../utils/errors.js';
+import { NotFoundError, AuthorizationError, ValidationError } from '../utils/errors.js';
 
 export class AutomationService {
   async listAutomations(agencyId, filters = {}) {
@@ -79,6 +80,47 @@ export class AutomationService {
     return {
       message: `Automation rule "${existing.name}" archived successfully.`,
       automation: archived,
+    };
+  }
+
+  async testAction(id, testPayload = {}, agencyId, user) {
+    const rule = await this.getAutomation(id, agencyId);
+
+    if (testPayload.confirmed !== true) {
+      throw new ValidationError('Explicit confirmation (confirmed: true) is required to execute a manual action test.');
+    }
+
+    const leadId = testPayload.leadId || null;
+    const actionResults = [];
+
+    for (const action of rule.actions || []) {
+      const result = await actionExecutor.executeAction(action, {
+        leadId,
+        agencyId,
+        clientId: rule.clientId,
+        eventId: `MANUAL_TEST_${Date.now()}`,
+        source: 'MANUAL_TEST',
+        ruleId: rule.id,
+        ruleName: rule.name,
+      });
+      actionResults.push(result);
+    }
+
+    await auditService.log({
+      actorId: user.userId,
+      agencyId,
+      clientId: rule.clientId,
+      action: 'AUTOMATION_TEST_EXECUTED',
+      entityType: 'AUTOMATION_RULE',
+      entityId: rule.id,
+      metadata: { actionCount: actionResults.length },
+    });
+
+    return {
+      success: true,
+      ruleId: rule.id,
+      ruleName: rule.name,
+      results: actionResults,
     };
   }
 

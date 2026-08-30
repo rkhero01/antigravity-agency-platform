@@ -186,15 +186,44 @@ flowchart TD
 - **Triggers**:
   - `LEAD_CREATED`: Dispatched immediately when a new lead is persisted from a verified Meta Lead Ads webhook, CRM API, or direct intake.
 - **Actions**:
-  - `CREATE_CRM_TASK`: Schedules a follow-up action for sales specialists.
-  - `UPDATE_LEAD_STAGE`: Advances lead pipeline stage (`NEW` -> `CONTACTED` -> `QUALIFIED`).
-  - `ASSIGN_LEAD_OWNER`: Designates lead owner.
+  - `CRM_UPDATE_STAGE`: Advances lead pipeline stage (`NEW` -> `CONTACTED` -> `QUALIFIED` -> `PROPOSAL_SENT` -> `WON` / `LOST`).
+  - `CRM_ASSIGN_OWNER`: Designates lead owner to operational agency personnel.
+  - `CRM_CREATE_TASK`: Schedules a follow-up action for sales specialists with unique DB task ID.
+  - `WHATSAPP_SEND`: Dispatches real Meta WhatsApp Cloud API messages (or returns `CONFIGURATION_REQUIRED` if unconfigured).
+  - `EMAIL_SEND`: Sends transactional notifications via Resend / SendGrid / SMTP (or returns `CONFIGURATION_REQUIRED`).
+  - `SMS_SEND`: Sends SMS messages via Twilio (or returns `CONFIGURATION_REQUIRED`).
+  - `WEBHOOK_FORWARD`: SSRF-protected outbound HTTPS webhook forwarding with 5s timeout.
   - `LOG_AUDIT_EVENT`: Creates a cryptographically safe audit record.
-  - `SEND_WHATSAPP` / `DISPATCH_NOTIFICATION`: Requires active Meta WhatsApp Business API credentials; safely returns `CONFIGURATION_REQUIRED` if unconfigured.
 
 ### C. Idempotency & Safety Guarantees
 - **Persistent Key**: `agencyId:eventId:automationId` ensures no automation is triggered more than once for the same event delivery.
-- **RBAC**: Operational roles (`OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`) can configure rules; `VIEWER` and `ANALYST` have read-only access.
+- **RBAC**: Operational roles (`OWNER`, `ADMIN`, `MANAGER`, `OPERATOR`) can configure rules and trigger manual test actions; `VIEWER` and `ANALYST` have read-only access (`403 Forbidden`).
 - **Zero Token Leakage**: Execution history records only task parameters, status, timestamps, and error summaries with all secrets sanitized.
+
+---
+
+## 8. External Action Engine, SSRF Guard & Failure Classification
+
+### A. SSRF Protection Model
+The `ssrfGuard` evaluates all outbound URLs prior to dispatch:
+1. **Protocol Enforcement**: Only `https:` (and explicitly designated `http:` targets) are allowed.
+2. **Loopback & Host Blacklisting**: Explicitly blocks `localhost`, `127.0.0.1`, `0.0.0.0`, `::1`, `metadata.google.internal`, `instance-data`.
+3. **Private IP Blocking**: Blocks IPv4 RFC1918 ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
+4. **Link-Local & Cloud Metadata Blocking**: Blocks `169.254.0.0/16` (e.g., `169.254.169.254`).
+5. **IPv6 Boundary Protection**: Blocks `fe80:`, `fc00:`, `fd00:`, `[::1]`.
+
+### B. Standardized Execution States
+- **`SUCCESS`**: Action was verified and executed by the internal engine or confirmed by the external provider API.
+- **`CONFIGURATION_REQUIRED`**: External delivery channel credentials (Meta WhatsApp, Twilio, Resend) are unset in the environment.
+- **`NEEDS_REAUTH`**: External provider returned HTTP 401 or 403 due to invalid/expired tokens.
+- **`RATE_LIMITED`**: Provider returned HTTP 429 Too Many Requests.
+- **`FAILED`**: Malformed payload, network timeout (5s limit), or permanent 4xx/5xx rejection.
+- **`DUPLICATE`**: Duplicate event ID skipped via persistent idempotency check.
+
+### C. Manual Action Test API
+- **Endpoint**: `POST /api/v1/automations/:id/test`
+- **Safeguard**: Requires `{ confirmed: true }` in request body.
+- **RBAC**: Only `OWNER`, `ADMIN`, `MANAGER`, `OPERATOR` roles may invoke test actions.
+
 
 

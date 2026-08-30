@@ -24,6 +24,7 @@ automationRoutes.post('/', automationController.createAutomation);
 automationRoutes.patch('/:id', automationController.updateAutomation);
 automationRoutes.patch('/:id/enable', automationController.enableAutomation);
 automationRoutes.patch('/:id/disable', automationController.disableAutomation);
+automationRoutes.post('/:id/test', automationController.testAutomationAction);
 automationRoutes.delete('/:id', automationController.deleteAutomation);
 
 export default automationRoutes;
